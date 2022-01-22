@@ -12,7 +12,7 @@ require (
 	github.com/antchfx/xmlquery v1.3.8 // indirect
 	github.com/antchfx/xpath v1.2.0 // indirect
 	github.com/arl/statsviz v0.4.0
-	github.com/cloudflare/cloudflare-go v0.28.0
+	github.com/cloudflare/cloudflare-go v0.30.0
 	github.com/gammazero/workerpool v1.1.2
 	github.com/ghodss/yaml v1.0.0
 	github.com/gin-contrib/cache v1.1.0
@@ -67,7 +67,6 @@ require (
 	github.com/jackc/pgx/v4 v4.14.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.4 // indirect
-	github.com/jteeuwen/go-bindata v3.0.7+incompatible // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
