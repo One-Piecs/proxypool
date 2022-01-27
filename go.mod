@@ -12,7 +12,7 @@ require (
 	github.com/antchfx/xmlquery v1.3.8 // indirect
 	github.com/antchfx/xpath v1.2.0 // indirect
 	github.com/arl/statsviz v0.4.0
-	github.com/cloudflare/cloudflare-go v0.28.0
+	github.com/cloudflare/cloudflare-go v0.31.0
 	github.com/gammazero/workerpool v1.1.2
 	github.com/ghodss/yaml v1.0.0
 	github.com/gin-contrib/cache v1.1.0
