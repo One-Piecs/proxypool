@@ -7,7 +7,7 @@ go 1.17
 require (
 	github.com/Dreamacro/clash v1.9.0
 	github.com/arl/statsviz v0.4.1
-	github.com/cloudflare/cloudflare-go v0.31.0
+	github.com/cloudflare/cloudflare-go v0.32.0
 	github.com/gammazero/workerpool v1.1.2
 	github.com/ghodss/yaml v1.0.0
 	github.com/gin-contrib/cache v1.1.0
