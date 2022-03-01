@@ -25,7 +25,7 @@ require (
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	gorm.io/driver/postgres v1.2.3
-	gorm.io/gorm v1.22.5
+	gorm.io/gorm v1.23.2
 
 )
 
