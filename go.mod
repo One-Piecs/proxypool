@@ -7,7 +7,7 @@ go 1.18
 require (
 	github.com/Dreamacro/clash v1.10.0
 	github.com/arl/statsviz v0.4.1
-	github.com/cloudflare/cloudflare-go v0.35.1
+	github.com/cloudflare/cloudflare-go v0.38.0
 	github.com/gammazero/workerpool v1.1.2
 	github.com/ghodss/yaml v1.0.0
 	github.com/gin-contrib/cache v1.1.0
@@ -47,6 +47,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gomodule/redigo v2.0.0+incompatible // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.11.0 // indirect
