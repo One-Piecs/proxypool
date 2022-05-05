@@ -14,7 +14,7 @@ require (
 	github.com/gin-contrib/pprof v1.3.0
 	github.com/gin-gonic/gin v1.7.7
 	github.com/gocolly/colly v1.2.0
-	github.com/google/gops v0.3.22
+	github.com/google/gops v0.3.23
 	github.com/heroku/x v0.0.50
 	github.com/ivpusic/grpool v1.0.0
 	github.com/jasonlvhit/gocron v0.0.1
