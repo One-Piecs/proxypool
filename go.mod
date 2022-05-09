@@ -5,7 +5,7 @@ module github.com/One-Piecs/proxypool
 go 1.18
 
 require (
-	github.com/Dreamacro/clash v1.10.0
+	github.com/Dreamacro/clash v1.10.6
 	github.com/arl/statsviz v0.4.1
 	github.com/cloudflare/cloudflare-go v0.35.1
 	github.com/gammazero/workerpool v1.1.2
@@ -18,7 +18,7 @@ require (
 	github.com/heroku/x v0.0.50
 	github.com/ivpusic/grpool v1.0.0
 	github.com/jasonlvhit/gocron v0.0.1
-	github.com/oschwald/geoip2-golang v1.6.1
+	github.com/oschwald/geoip2-golang v1.7.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/robertkrimen/otto v0.0.0-20211024170158-b87d35c0b86f
 	github.com/sirupsen/logrus v1.8.1
@@ -30,7 +30,7 @@ require (
 )
 
 require (
-	github.com/Dreamacro/go-shadowsocks2 v0.1.7 // indirect
+	github.com/Dreamacro/go-shadowsocks2 v0.1.8 // indirect
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/antchfx/htmlquery v1.2.4 // indirect
@@ -67,16 +67,16 @@ require (
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/oschwald/maxminddb-golang v1.8.0 // indirect
+	github.com/oschwald/maxminddb-golang v1.9.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/robfig/go-cache v0.0.0-20130306151617-9fc39e0dbf62 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
-	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
-	golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8 // indirect
+	golang.org/x/crypto v0.0.0-20220507011949-2cf3adece122 // indirect
+	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
+	golang.org/x/sys v0.0.0-20220503163025-988cb79eb6c6 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65 // indirect
