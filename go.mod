@@ -5,7 +5,7 @@ module github.com/One-Piecs/proxypool
 go 1.18
 
 require (
-	github.com/Dreamacro/clash v1.10.6
+	github.com/Dreamacro/clash v1.11.0
 	github.com/arl/statsviz v0.4.1
 	github.com/cloudflare/cloudflare-go v0.38.0
 	github.com/gammazero/workerpool v1.1.2
@@ -23,14 +23,13 @@ require (
 	github.com/robertkrimen/otto v0.0.0-20211024170158-b87d35c0b86f
 	github.com/sirupsen/logrus v1.8.1
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.3.5
 	gorm.io/gorm v1.23.5
 
 )
 
 require (
-	github.com/Dreamacro/go-shadowsocks2 v0.1.8 // indirect
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/antchfx/htmlquery v1.2.4 // indirect
@@ -75,9 +74,9 @@ require (
 	github.com/temoto/robotstxt v1.1.2 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	golang.org/x/crypto v0.0.0-20220507011949-2cf3adece122 // indirect
-	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
-	golang.org/x/sys v0.0.0-20220503163025-988cb79eb6c6 // indirect
+	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
+	golang.org/x/net v0.0.0-20220617184016-355a448f1bc9 // indirect
+	golang.org/x/sys v0.0.0-20220615213510-4f61da869c0c // indirect
 	golang.org/x/term v0.0.0-20220411215600-e5f449aeb171 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect
