@@ -7,7 +7,7 @@ go 1.18
 require (
 	github.com/Dreamacro/clash v1.10.6
 	github.com/arl/statsviz v0.4.1
-	github.com/cloudflare/cloudflare-go v0.38.0
+	github.com/cloudflare/cloudflare-go v0.43.0
 	github.com/gammazero/workerpool v1.1.2
 	github.com/ghodss/yaml v1.0.0
 	github.com/gin-contrib/cache v1.1.0
@@ -23,7 +23,7 @@ require (
 	github.com/robertkrimen/otto v0.0.0-20211024170158-b87d35c0b86f
 	github.com/sirupsen/logrus v1.8.1
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.3.5
 	gorm.io/gorm v1.23.5
 
