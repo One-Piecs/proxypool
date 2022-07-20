@@ -15,7 +15,7 @@ require (
 	github.com/gin-gonic/gin v1.8.1
 	github.com/gocolly/colly v1.2.0
 	github.com/google/gops v0.3.25
-	github.com/heroku/x v0.0.50
+	github.com/heroku/x v0.0.51
 	github.com/ivpusic/grpool v1.0.0
 	github.com/jasonlvhit/gocron v0.0.1
 	github.com/oschwald/geoip2-golang v1.7.0
