@@ -8,7 +8,7 @@ require (
 	github.com/Dreamacro/clash v1.11.4
 	github.com/arl/statsviz v0.4.1
 	github.com/cloudflare/cloudflare-go v0.44.0
-	github.com/gammazero/workerpool v1.1.2
+	github.com/gammazero/workerpool v1.1.3
 	github.com/ghodss/yaml v1.0.0
 	github.com/gin-contrib/cache v1.2.0
 	github.com/gin-contrib/pprof v1.4.0
@@ -36,7 +36,7 @@ require (
 	github.com/antchfx/xmlquery v1.3.11 // indirect
 	github.com/antchfx/xpath v1.2.1 // indirect
 	github.com/bradfitz/gomemcache v0.0.0-20220106215444-fb4bf637b56d // indirect
-	github.com/gammazero/deque v0.1.0 // indirect
+	github.com/gammazero/deque v0.2.0 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
