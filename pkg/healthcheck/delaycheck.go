@@ -190,5 +190,6 @@ func testDelay(p proxy.Proxy) (delay uint16, err error) {
 	*/
 	ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
 	defer cancel()
-	return clashProxy.URLTest(ctx, "http://www.google.com/generate_204")
+	// return clashProxy.URLTest(ctx, "http://www.google.com/generate_204")
+	return clashProxy.URLTest(ctx, "https://www.v2ex.com/generate_204")
 }

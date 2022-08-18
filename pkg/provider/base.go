@@ -50,7 +50,7 @@ func (b *Base) preFilter() {
 		needFilterNotCountry = false
 	}
 	if b.Speed == "" {
-		needFilterSpeed = true
+		needFilterSpeed = false
 	}
 	if b.Filter == "" {
 		needFilterFilter = false
