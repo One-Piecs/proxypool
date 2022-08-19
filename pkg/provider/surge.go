@@ -23,7 +23,6 @@ func (s Surge) Provide() string {
 			resultBuilder.WriteString(p.ToSurge() + "\n")
 		}
 	}
-	resultBuilder.WriteString("🐈 ClashX = socks5, 127.0.0.1, 7890" + "\n")
 	return resultBuilder.String()
 }
 
