@@ -139,8 +139,11 @@ func (g *TGChannelGetter) Get() proxy.ProxyList {
 						if strings.Contains(e, "yaml") || strings.Contains(e, "yml") {
 							subResult = append(subResult, (&Clash{Url: e}).Get()...)
 						} else if strings.Contains(e, ".mp4") ||
+							strings.Contains(e, ".MP4") ||
 							strings.Contains(e, ".jpg") ||
-							strings.Contains(e, ".jpeg") {
+							strings.Contains(e, ".JPG") ||
+							strings.Contains(e, ".jpeg") ||
+							strings.Contains(e, ".JPEG") {
 							continue
 						} else {
 							subResult = append(subResult, (&WebFuzz{Url: e}).Get()...)
