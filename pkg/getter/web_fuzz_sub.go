@@ -36,7 +36,7 @@ func (w *WebFuzzSub) Get() proxy.ProxyList {
 	subUrls := urlRe.FindAllString(text, -1)
 	result := make(proxy.ProxyList, 0)
 
-	wp := workerpool.New(50)
+	wp := workerpool.New(250)
 	m := sync.Mutex{}
 
 	for _, url := range subUrls {
