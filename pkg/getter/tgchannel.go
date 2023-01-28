@@ -140,6 +140,8 @@ func (g *TGChannelGetter) Get() proxy.ProxyList {
 							subResult = append(subResult, (&Clash{Url: e}).Get()...)
 						} else if strings.Contains(e, ".mp4") ||
 							strings.Contains(e, ".MP4") ||
+							strings.Contains(e, ".apk") ||
+							strings.Contains(e, ".APK") ||
 							strings.Contains(e, ".jpg") ||
 							strings.Contains(e, ".JPG") ||
 							strings.Contains(e, ".jpeg") ||
