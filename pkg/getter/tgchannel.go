@@ -142,6 +142,14 @@ func (g *TGChannelGetter) Get() proxy.ProxyList {
 							strings.Contains(e, ".MP4") ||
 							strings.Contains(e, ".apk") ||
 							strings.Contains(e, ".APK") ||
+							strings.Contains(e, ".png") ||
+							strings.Contains(e, ".rar") ||
+							strings.Contains(e, ".zip") ||
+							strings.Contains(e, ".7z") ||
+							strings.Contains(e, ".gz") ||
+							strings.Contains(e, ".flac") ||
+							strings.Contains(e, ".mp3") ||
+							strings.Contains(e, ".webp") ||
 							strings.Contains(e, ".jpg") ||
 							strings.Contains(e, ".JPG") ||
 							strings.Contains(e, ".jpeg") ||
