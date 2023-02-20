@@ -143,6 +143,16 @@ func CrawlGo() {
 		}
 	}
 
+	// 检测是否支持ChatGPT
+	healthcheck.CheckWorkpool(proxies)
+	for i := range proxies {
+		if s, ok := healthcheck.ProxyStats.Find(proxies[i]); ok {
+			if s.ChatGPT {
+				proxies[i].SetName(fmt.Sprintf("ChatGPT %s", proxies[i].BaseInfo().Name))
+			}
+		}
+	}
+
 	proxies.Sort().NameAddIndex()
 
 	// 可用节点存储

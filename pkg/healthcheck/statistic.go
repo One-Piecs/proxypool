@@ -9,6 +9,7 @@ type Stat struct {
 	ReqCount uint16
 	Relay    bool
 	Pool     bool
+	ChatGPT  bool
 	OutIp    string
 	Id       string
 }

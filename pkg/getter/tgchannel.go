@@ -149,6 +149,7 @@ func (g *TGChannelGetter) Get() proxy.ProxyList {
 							strings.Contains(e, ".gz") ||
 							strings.Contains(e, ".flac") ||
 							strings.Contains(e, ".mp3") ||
+							strings.Contains(e, ".json") ||
 							strings.Contains(e, ".webp") ||
 							strings.Contains(e, ".jpg") ||
 							strings.Contains(e, ".JPG") ||
