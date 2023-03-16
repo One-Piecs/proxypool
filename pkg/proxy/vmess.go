@@ -452,8 +452,9 @@ func str2jsonDynaUnmarshal(s string) (jsn map[string]interface{}, err error) {
 	if err != nil {
 		return nil, err
 	}
-	jsn = f.(map[string]interface{}) // f is pointer point to map struct
-	if jsn == nil {
+	var ok bool
+	jsn, ok = f.(map[string]interface{}) // f is pointer point to map struct
+	if jsn == nil || !ok {
 		return nil, ErrorVmessPayloadParseFail
 	}
 	return jsn, err
