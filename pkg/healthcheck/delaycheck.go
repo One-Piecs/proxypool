@@ -34,7 +34,7 @@ func CleanBadProxiesWithGrpool(proxies []proxy.Proxy) (cproxies []proxy.Proxy) {
 			pp := p // 捕获，否则job执行时是按当前的p测试的
 			pool.JobQueue <- func() {
 				defer pool.JobDone()
-				delay, err := testDelay(pp)
+				delay, _, err := testDelay(pp)
 				if err == nil && delay != 0 {
 					m.Lock()
 					if ps, ok := ProxyStats.Find(pp); ok {
@@ -98,7 +98,7 @@ func CleanBadProxiesWithWorkpool(proxies []proxy.Proxy) (cproxies []proxy.Proxy)
 	for _, p := range proxies {
 		pp := p
 		pool.Submit(func() {
-			delay, err := testDelay(pp)
+			delay, _, err := testDelay(pp)
 			if err == nil && delay != 0 {
 				if ps, ok := ProxyStats.Find(pp); ok {
 					ps.UpdatePSDelay(delay)
@@ -152,7 +152,7 @@ func CleanBadProxiesWithWorkpool(proxies []proxy.Proxy) (cproxies []proxy.Proxy)
 }
 
 // Return 0 for error
-func testDelay(p proxy.Proxy) (delay uint16, err error) {
+func testDelay(p proxy.Proxy) (delay, meanDelay uint16, err error) {
 	pmap := make(map[string]interface{})
 	err = json.Unmarshal([]byte(p.String()), &pmap)
 	if err != nil {
@@ -163,19 +163,14 @@ func testDelay(p proxy.Proxy) (delay uint16, err error) {
 	if p.TypeName() == "vmess" {
 		pmap["alterId"] = int(pmap["alterId"].(float64))
 		if network, ok := pmap["network"]; ok && network.(string) == "h2" {
-			return 0, nil // todo 暂无方法测试h2的延迟，clash对于h2的connection会阻塞  tls.handshake ??
+			return 0, 0, nil // todo 暂无方法测试h2的延迟，clash对于h2的connection会阻塞  tls.handshake ??
 		}
 	}
-
-	// // todo 等待 更新 go1.17 tls.handshakeContext
-	// if p.TypeName() == "trojan" && p.BaseInfo().Server == "nl-trojan.bonds.id" {
-	// 	return 0, nil // 此 trojan 节点会阻塞
-	// }
 
 	clashProxy, err := adapter.ParseProxy(pmap)
 	if err != nil {
 		fmt.Println(err.Error())
-		return 0, err
+		return 0, 0, err
 	}
 	/*
 		sTime := time.Now()
