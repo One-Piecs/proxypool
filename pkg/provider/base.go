@@ -23,6 +23,7 @@ type Base struct {
 	NotCountry string           `yaml:"not_country"`
 	Speed      string           `yaml:"speed"`
 	Filter     string           `yaml:"filter"`
+	UDP        string           `yaml:"udp"`
 }
 
 // 根据子类的的Provide()传入的信息筛选节点，结果会改变传入的proxylist。
@@ -40,6 +41,8 @@ func (b *Base) preFilter() {
 	needFilterNotCountry := true
 	needFilterSpeed := true
 	needFilterFilter := true
+	needFilterUDP := true
+
 	if b.Types == "" || b.Types == "all" {
 		needFilterType = false
 	}
@@ -55,6 +58,9 @@ func (b *Base) preFilter() {
 	if b.Filter == "" {
 		needFilterFilter = false
 	}
+	if b.UDP == "" {
+		needFilterUDP = false
+	}
 	types := strings.Split(b.Types, ",")
 	countries := strings.Split(b.Country, ",")
 	notCountries := strings.Split(b.NotCountry, ",")
@@ -66,6 +72,15 @@ func (b *Base) preFilter() {
 
 	bProxies := *b.Proxies
 	for _, p := range bProxies {
+
+		if needFilterUDP {
+			if b.UDP == "true" {
+				if !p.BaseInfo().UDP {
+					goto exclude
+				}
+			}
+		}
+
 		if needFilterType {
 			typeOk := false
 			for _, t := range types {
