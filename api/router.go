@@ -127,7 +127,6 @@ func setupRouter() {
 		proxyNotCountry := c.DefaultQuery("nc", "")
 		proxySpeed := c.DefaultQuery("speed", "")
 		proxyFilter := c.DefaultQuery("filter", "")
-		proxyUDP := c.DefaultQuery("udp", "")
 		text := ""
 		if proxyTypes == "" && proxyCountry == "" && proxyNotCountry == "" && proxySpeed == "" && proxyFilter == "" {
 			text = appcache.GetString("clashproxies") // A string. To show speed in this if condition, this must be updated after speedtest
@@ -151,7 +150,6 @@ func setupRouter() {
 					NotCountry: proxyNotCountry,
 					Speed:      proxySpeed,
 					Filter:     proxyFilter,
-					UDP:        proxyUDP,
 				},
 			}
 			text = clash.Provide() // 根据Query筛选节点
@@ -165,7 +163,6 @@ func setupRouter() {
 					NotCountry: proxyNotCountry,
 					Speed:      proxySpeed,
 					Filter:     proxyFilter,
-					UDP:        proxyUDP,
 				},
 			}
 			text = clash.Provide() // 根据Query筛选节点
@@ -178,7 +175,6 @@ func setupRouter() {
 		proxyNotCountry := c.DefaultQuery("nc", "")
 		proxySpeed := c.DefaultQuery("speed", "")
 		proxyFilter := c.DefaultQuery("filter", "")
-		proxyUDP := c.DefaultQuery("udp", "")
 		text := ""
 		if proxyTypes == "" && proxyCountry == "" && proxyNotCountry == "" && proxySpeed == "" && proxyFilter == "" {
 			text = appcache.GetString("surgeproxies") // A string. To show speed in this if condition, this must be updated after speedtest
@@ -202,7 +198,6 @@ func setupRouter() {
 					NotCountry: proxyNotCountry,
 					Speed:      proxySpeed,
 					Filter:     proxyFilter,
-					UDP:        proxyUDP,
 				},
 			}
 			text = surge.Provide()
@@ -216,7 +211,6 @@ func setupRouter() {
 					NotCountry: proxyNotCountry,
 					Speed:      proxySpeed,
 					Filter:     proxyFilter,
-					UDP:        proxyUDP,
 				},
 			}
 			text = surge.Provide()
@@ -230,7 +224,6 @@ func setupRouter() {
 		proxyNotCountry := c.DefaultQuery("nc", "")
 		proxySpeed := c.DefaultQuery("speed", "")
 		proxyFilter := c.DefaultQuery("filter", "")
-		proxyUDP := c.DefaultQuery("udp", "")
 		text := ""
 		if proxyTypes == "" && proxyCountry == "" && proxyNotCountry == "" && proxySpeed == "" && proxyFilter == "" {
 			text = appcache.GetString("loonproxies") // A string. To show speed in this if condition, this must be updated after speedtest
@@ -254,7 +247,6 @@ func setupRouter() {
 					NotCountry: proxyNotCountry,
 					Speed:      proxySpeed,
 					Filter:     proxyFilter,
-					UDP:        proxyUDP,
 				},
 			}
 			text = loon.Provide() // 根据Query筛选节点
@@ -268,7 +260,6 @@ func setupRouter() {
 					NotCountry: proxyNotCountry,
 					Speed:      proxySpeed,
 					Filter:     proxyFilter,
-					UDP:        proxyUDP,
 				},
 			}
 			text = loon.Provide() // 根据Query筛选节点
