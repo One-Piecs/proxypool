@@ -51,15 +51,15 @@ func (ss Shadowsocks) ToClash() string {
 func (ss Shadowsocks) ToSurge() string {
 	// node1 = ss, server, port, encrypt-method=, password=, obfs=, obfs-host=, udp-relay=false
 	if ss.Plugin == "obfs" {
-		text := fmt.Sprintf("%s = ss, %s, %d, encrypt-method=%s, password=%s, obfs=%s, udp-relay=false",
-			ss.Name, ss.Server, ss.Port, ss.Cipher, ss.Password, ss.PluginOpts["mode"])
+		text := fmt.Sprintf("%s = ss, %s, %d, encrypt-method=%s, password=%s, obfs=%s, udp-relay=%v",
+			ss.Name, ss.Server, ss.Port, ss.Cipher, ss.Password, ss.PluginOpts["mode"], ss.UDP)
 		if ss.PluginOpts["host"].(string) != "" {
 			text += ", obfs-host=" + ss.PluginOpts["host"].(string)
 		}
 		return text
 	} else {
-		return fmt.Sprintf("%s = ss, %s, %d, encrypt-method=%s, password=%s, udp-relay=false",
-			ss.Name, ss.Server, ss.Port, ss.Cipher, ss.Password)
+		return fmt.Sprintf("%s = ss, %s, %d, encrypt-method=%s, password=%s, udp-relay=%v",
+			ss.Name, ss.Server, ss.Port, ss.Cipher, ss.Password, ss.UDP)
 	}
 }
 
@@ -71,14 +71,14 @@ func (ss Shadowsocks) ToLoon() string {
 		// TODO: #ss+simple obfs
 		// ssObfs1 = Shadowsocks,example.com,80,aes-128-gcm,"password",obfs-name=http,obfs-host=www.micsoft.com,fast-open=true,udp=true
 		// ssObfs2 = Shadowsocks,example.com,443,aes-128-gcm,"password",obfs-name=tls,obfs-host=www.micsoft.com,fast-open=true,udp=true
-		return fmt.Sprintf(`%s = Shadowsocks,%s,%d,%s,"%s",%s,%s`,
-			ss.Name, ss.Server, ss.Port, ss.Cipher, ss.Password, ss.PluginOpts["mode"], ss.PluginOpts["host"])
+		return fmt.Sprintf(`%s = Shadowsocks,%s,%d,%s,"%s",%s,%s,udp=%v`,
+			ss.Name, ss.Server, ss.Port, ss.Cipher, ss.Password, ss.PluginOpts["mode"], ss.PluginOpts["host"], ss.UDP)
 	} else {
 		// TODO: #ss
 		// ss1 = Shadowsocks,example.com,443,aes-128-gcm,"password",fast-open=false,udp=true
 		// ss2 = Shadowsocks,example2.com,443,chacha20,"password",fast-open=true,udp=true
-		return fmt.Sprintf(`%s = Shadowsocks,%s,%d,%s,"%s",,`,
-			ss.Name, ss.Server, ss.Port, ss.Cipher, ss.Password)
+		return fmt.Sprintf(`%s = Shadowsocks,%s,%d,%s,"%s",udp=%v,`,
+			ss.Name, ss.Server, ss.Port, ss.Cipher, ss.Password, ss.UDP)
 	}
 }
 
