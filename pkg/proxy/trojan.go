@@ -57,8 +57,17 @@ func (t Trojan) ToClash() string {
 }
 
 func (t Trojan) ToSurge() string {
-	return fmt.Sprintf("%s = trojan, %s, %d, password=%s, skip-cert-verify=%v, udp-relay=%v",
-		t.Name, t.Server, t.Port, t.Password, t.SkipCertVerify, t.UDP)
+	// return fmt.Sprintf("%s = trojan, %s, %d, password=%s, skip-cert-verify=%v, udp-relay=%v",\
+	// t.Name, t.Server, t.Port, t.Password, t.SkipCertVerify, t.UDP)
+
+	s := strings.Builder{}
+	s.WriteString(fmt.Sprintf("%s = trojan, %s, %d, password=%s, skip-cert-verify=%v, udp-relay=%v",
+		t.Name, t.Server, t.Port, t.Password, t.SkipCertVerify, t.UDP))
+	if t.SNI != "" {
+		s.WriteString(", sni=")
+		s.WriteString(t.SNI)
+	}
+	return s.String()
 }
 
 func (t Trojan) ToLoon() string {
