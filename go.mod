@@ -6,10 +6,8 @@ go 1.21
 
 toolchain go1.22.2
 
-//replace github.com/Dreamacro/clash => ../clash
-
 require (
-	github.com/arl/statsviz v0.5.2
+	github.com/arl/statsviz v0.6.0
 	github.com/cloudflare/cloudflare-go v0.73.0
 	github.com/gammazero/workerpool v1.1.3
 	github.com/ghodss/yaml v1.0.0

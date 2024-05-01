@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/arl/statsviz"
+
 	"github.com/One-Piecs/proxypool/log"
 	"github.com/One-Piecs/proxypool/pkg/geoIp"
 	"github.com/One-Piecs/proxypool/pkg/provider"
 
 	"github.com/One-Piecs/proxypool/internal/app"
-	// "github.com/One-Piecs/proxypool/internal/bindata"
-	"github.com/arl/statsviz"
 
 	"github.com/One-Piecs/proxypool/config"
 	appcache "github.com/One-Piecs/proxypool/internal/cache"
@@ -48,12 +48,18 @@ func setupRouter() {
 
 	// router.Use(gin.Recovery())
 	pprof.Register(router)
+
+	// Create statsviz server.
+	srv, _ := statsviz.NewServer(statsviz.Root("/debug/statsviz"))
+	ws := srv.Ws()
+	index := srv.Index()
+
 	router.GET("/debug/statsviz/*filepath", func(context *gin.Context) {
 		if context.Param("filepath") == "/ws" {
-			statsviz.Ws(context.Writer, context.Request)
+			ws(context.Writer, context.Request)
 			return
 		}
-		statsviz.IndexAtRoot("/debug/statsviz").ServeHTTP(context.Writer, context.Request)
+		index(context.Writer, context.Request)
 	})
 
 	// router.StaticFS("/static", http.FS(config.StaticFS))
