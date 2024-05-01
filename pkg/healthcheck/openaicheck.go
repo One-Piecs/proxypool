@@ -11,10 +11,10 @@ import (
 
 	"golang.org/x/exp/slices"
 
-	"github.com/Dreamacro/clash/adapter"
 	"github.com/One-Piecs/proxypool/log"
 	"github.com/One-Piecs/proxypool/pkg/proxy"
 	"github.com/gammazero/workerpool"
+	"github.com/metacubex/mihomo/adapter"
 )
 
 func CheckWorkpool(proxies proxy.ProxyList) {

@@ -7,7 +7,7 @@ import (
 	"math"
 	"time"
 
-	C "github.com/Dreamacro/clash/constant"
+	C "github.com/metacubex/mihomo/constant"
 )
 
 // Server information

@@ -6,11 +6,13 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
+	"strconv"
 	"time"
 
-	C "github.com/Dreamacro/clash/constant"
 	"github.com/One-Piecs/proxypool/pkg/proxy"
+	C "github.com/metacubex/mihomo/constant"
 )
 
 // DO NOT EDIT. Copied from clash because it's an unexported function
@@ -33,11 +35,13 @@ func urlToMetadata(rawURL string) (addr C.Metadata, err error) {
 		}
 	}
 
+	dstPortPort, _ := strconv.Atoi(port)
+
 	addr = C.Metadata{
 		// AddrType: C.AtypDomainName,
 		Host:    u.Hostname(),
-		DstIP:   nil,
-		DstPort: port,
+		DstIP:   netip.Addr{},
+		DstPort: uint16(dstPortPort),
 	}
 	return
 }

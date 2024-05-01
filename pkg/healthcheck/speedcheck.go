@@ -13,13 +13,13 @@ import (
 
 	"github.com/gammazero/workerpool"
 
-	"github.com/Dreamacro/clash/adapter"
+	"github.com/metacubex/mihomo/adapter"
 
-	C "github.com/Dreamacro/clash/constant"
 	"github.com/One-Piecs/proxypool/config"
 	"github.com/One-Piecs/proxypool/log"
 	"github.com/One-Piecs/proxypool/pkg/proxy"
 	"github.com/ivpusic/grpool"
+	C "github.com/metacubex/mihomo/constant"
 )
 
 var (

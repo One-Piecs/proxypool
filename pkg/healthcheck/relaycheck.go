@@ -10,7 +10,7 @@ import (
 
 	"github.com/gammazero/workerpool"
 
-	"github.com/Dreamacro/clash/adapter"
+	"github.com/metacubex/mihomo/adapter"
 
 	"github.com/One-Piecs/proxypool/log"
 	"github.com/One-Piecs/proxypool/pkg/proxy"
