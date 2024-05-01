@@ -44,3 +44,31 @@ tg_channel_proxy_url: "http://127.0.0.1:9504/rss/"
 v2_ws_header_user_agent: "user-agent:Mozilla/5.0 (iPhone; CPU iPhone OS 13_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.1 Mobile/15E148 Safari/604.1"
 
 geoip_db_url: "https://raw.githubusercontent.com/alecthw/mmdb_china_ip_list/release/"
+
+
+sub_ip_url:
+  - "https://VLESS.xxxxx.com/sub"
+
+proxy_info:
+  JP:
+    vless:
+      host: "1.top"
+      uuid: "24b566e4-8ef6-4693-b502-26c43ac49fb7"
+      path: "/path1"
+    vmess:
+      host: "1.top"
+      uuid: "24b566e4-8ef6-4693-b502-26c43ac49fb7"
+      path: "/path2"
+    trojan:
+      host: "1.top"
+      password: "tr0jan@^**))"
+      path: "/websocket"
+  KR:
+    vmess:
+      host: "2.top"
+      uuid: "24b566e4-8ef6-4693-b502-26c43ac49fb7"
+      path: "/path1"
+    trojan:
+      host: "2.top"
+      password: "password"
+      path: "/websocket"

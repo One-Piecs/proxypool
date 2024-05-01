@@ -382,6 +382,30 @@ func setupRouter() {
 		}()
 		c.String(200, "ok")
 	})
+
+	router.GET("/bestProxyIp/:format", func(c *gin.Context) {
+		format := c.Param("format")
+		country := c.Query("c")
+		if country == "" {
+			country = "JP"
+		}
+		text, err := app.SubNiceProxyIp2(format, country)
+		if err != nil {
+			c.String(500, err.Error())
+			return
+		}
+		c.String(200, text)
+	})
+
+	router.GET("/bestIpKr/:format", func(c *gin.Context) {
+		format := c.Param("format")
+		text, err := app.SubNiceProxyIp2(format, "KR")
+		if err != nil {
+			c.String(500, err.Error())
+			return
+		}
+		c.String(200, text)
+	})
 }
 
 func Run() {
