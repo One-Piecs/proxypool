@@ -27,7 +27,7 @@ type Format struct {
 	Vless  bool
 }
 
-func SubNiceProxyIp2(format string, distNodeCountry string) (s string, err error) {
+func SubNiceProxyIp(format string, distNodeCountry string) (s string, err error) {
 	f, err := checkFormat(format, distNodeCountry)
 	if err != nil {
 		return "", err
@@ -289,7 +289,6 @@ func genClashVmessUrl(buf *strings.Builder, nodeCountry, country, ip string, por
 `,
 		country, ip, ip, port,
 		config.Config.ProxyInfo[nodeCountry]["vmess"]["uuid"],
-		config.Config.ProxyInfo[nodeCountry]["vmess"]["host"],
 		config.Config.ProxyInfo[nodeCountry]["vmess"]["path"],
 		config.Config.ProxyInfo[nodeCountry]["vmess"]["host"],
 		config.Config.ProxyInfo[nodeCountry]["vmess"]["host"]))

@@ -395,7 +395,7 @@ func setupRouter() {
 		if country == "" {
 			country = "JP"
 		}
-		text, err := app.SubNiceProxyIp2(format, country)
+		text, err := app.SubNiceProxyIp(format, country)
 		if err != nil {
 			c.String(500, err.Error())
 			return
@@ -405,7 +405,7 @@ func setupRouter() {
 
 	router.GET("/bestIpKr/:format", func(c *gin.Context) {
 		format := c.Param("format")
-		text, err := app.SubNiceProxyIp2(format, "KR")
+		text, err := app.SubNiceProxyIp(format, "KR")
 		if err != nil {
 			c.String(500, err.Error())
 			return
