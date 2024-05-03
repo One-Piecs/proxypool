@@ -390,6 +390,13 @@ func setupRouter() {
 	})
 
 	router.GET("/bestProxyIp/:format", func(c *gin.Context) {
+		err := config.Parse("")
+		if err != nil {
+			log.Errorln("config parse error: %s", err)
+			c.String(500, err.Error())
+			return
+		}
+
 		format := c.Param("format")
 		country := c.Query("c")
 		if country == "" {
@@ -404,6 +411,13 @@ func setupRouter() {
 	})
 
 	router.GET("/bestIpKr/:format", func(c *gin.Context) {
+		err := config.Parse("")
+		if err != nil {
+			log.Errorln("config parse error: %s", err)
+			c.String(500, err.Error())
+			return
+		}
+
 		format := c.Param("format")
 		text, err := app.SubNiceProxyIp(format, "KR")
 		if err != nil {
