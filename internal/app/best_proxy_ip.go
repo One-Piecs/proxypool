@@ -27,6 +27,7 @@ import (
 type Format struct {
 	Surge  bool
 	Clash  bool
+	QuanX  bool
 	Vmess  bool
 	Trojan bool
 	Vless  bool
@@ -170,6 +171,7 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 
 	switch format {
 	case "surgeVmess", "surgeTrojan":
+	case "quanxVmess", "quanxTrojan", "quanxVless":
 	case "clashVmess", "clashTrojan", "clashVless":
 		buf.WriteString("proxies:\n")
 	default:
@@ -202,7 +204,16 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 			} else if f.Vless {
 				genClashVlessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
 			}
+		} else if f.QuanX {
+			if f.Vmess {
+				genQuanXVmessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
+			} else if f.Trojan {
+				genQuanXTrojanUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
+			} else if f.Vless {
+				genQuanXVlessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
+			}
 		}
+
 	}
 
 	return buf.String(), nil
@@ -226,6 +237,8 @@ func checkFormat(format string, distNodeCountry string) (f Format, err error) {
 		f.Surge = true
 	} else if strings.Contains(format, "clash") {
 		f.Clash = true
+	} else if strings.Contains(format, "quanx") {
+		f.QuanX = true
 	} else {
 		return f, fmt.Errorf("invaild client format")
 	}
@@ -324,4 +337,37 @@ func genClashTrojanUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, node_co
 		proxyInfo[node_country]["trojan"]["host"],
 		proxyInfo[node_country]["trojan"]["path"],
 		proxyInfo[node_country]["trojan"]["host"]))
+}
+
+func genQuanXVlessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`vless = %s:%d, method=none, password=%s, obfs=wss, obfs-uri=%s, obfs-host=%s, tls-verification=false, tls-host=%s, fast-open=false, udp-relay=true, tag=%s %-15.15s
+`,
+		ip, port,
+		proxyInfo[nodeCountry]["vless"]["uuid"],
+		proxyInfo[nodeCountry]["vless"]["path"],
+		proxyInfo[nodeCountry]["vless"]["host"],
+		proxyInfo[nodeCountry]["vless"]["host"],
+		country, ip))
+}
+
+func genQuanXVmessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`vmess = %s:%d, method=none, password=%s, obfs=wss, obfs-uri=%s, obfs-host=%s, tls-host=%s, aead=true, tag=%s %-15.15s
+`,
+		ip, port,
+		proxyInfo[nodeCountry]["vless"]["uuid"],
+		proxyInfo[nodeCountry]["vless"]["path"],
+		proxyInfo[nodeCountry]["vless"]["host"],
+		proxyInfo[nodeCountry]["vless"]["host"],
+		country, ip))
+}
+
+func genQuanXTrojanUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`trojan = %s:%d, password=%s, obfs=wss, obfs-uri=%s, obfs-host=%s, tls-host=%s, tag=%s %-15.15s 
+`,
+		ip, port,
+		proxyInfo[nodeCountry]["trojan"]["password"],
+		proxyInfo[nodeCountry]["trojan"]["path"],
+		proxyInfo[nodeCountry]["trojan"]["host"],
+		proxyInfo[nodeCountry]["trojan"]["host"],
+		country, ip))
 }
