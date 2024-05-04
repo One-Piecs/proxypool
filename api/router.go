@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/One-Piecs/proxypool/internal/cron"
+
 	"github.com/arl/statsviz"
 
 	"github.com/One-Piecs/proxypool/log"
@@ -384,6 +386,15 @@ func setupRouter() {
 			log.Infoln("Reloading GeoIP...")
 			// geoIp.ReInitGeoIpDB()
 			geoIp.UpdateGeoIP()
+			runtime.GC()
+		}()
+		c.String(200, "ok")
+	})
+
+	router.GET("/task/updateBestNode", func(c *gin.Context) {
+		go func() {
+			log.Infoln("updateBestNode...")
+			cron.CrawlBestNodeTask()
 			runtime.GC()
 		}()
 		c.String(200, "ok")
