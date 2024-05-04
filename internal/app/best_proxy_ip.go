@@ -149,6 +149,7 @@ func CrawlBestNode() {
 	}
 
 	cache.SetBestNodeList("bestNode", bestNodeList)
+	cache.SetString("bestNodeLastUpdateTime", time.Now().Format(time.RFC3339))
 }
 
 func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode string) (s string, err error) {
@@ -163,11 +164,11 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 	}
 
 	buf := strings.Builder{}
+	buf.WriteString("# " + cache.GetString("bestNodeLastUpdateTime") + "\n")
+
 	switch format {
 	case "surgeVmess", "surgeTrojan":
-		buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
 	case "clashVmess", "clashTrojan", "clashVless":
-		buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
 		buf.WriteString("proxies:\n")
 	default:
 		return "", fmt.Errorf("invalid format: %s", format)
