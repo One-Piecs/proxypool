@@ -121,9 +121,9 @@ func (v Vmess) ToSurge() string {
 
 		if wsHeasers != "" {
 			// text += ", ws-headers=" + wsHeasers
-			text += fmt.Sprintf(`, ws-headers="%s|%s"`, wsHeasers, config.Config.V2WsHeaderUserAgent)
+			text += fmt.Sprintf(`, ws-headers="%s|%s"`, wsHeasers, config.Config().V2WsHeaderUserAgent)
 		} else {
-			text += fmt.Sprintf(`, ws-headers="%s"`, config.Config.V2WsHeaderUserAgent)
+			text += fmt.Sprintf(`, ws-headers="%s"`, config.Config().V2WsHeaderUserAgent)
 		}
 		return text
 	} else {

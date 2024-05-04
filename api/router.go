@@ -72,7 +72,7 @@ func setupRouter() {
 
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.html", gin.H{
-			"domain":                      config.Config.Domain,
+			"domain":                      config.Config().Domain,
 			"getters_count":               appcache.GettersCount,
 			"all_proxies_count":           appcache.AllProxiesCount,
 			"ss_proxies_count":            appcache.SSProxiesCount,
@@ -93,37 +93,37 @@ func setupRouter() {
 
 	router.GET("/clash", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "clash.html", gin.H{
-			"domain": config.Config.Domain,
-			"port":   config.Config.Port,
+			"domain": config.Config().Domain,
+			"port":   config.Config().Port,
 		})
 	})
 
 	router.GET("/surge", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "surge.html", gin.H{
-			"domain": config.Config.Domain,
+			"domain": config.Config().Domain,
 		})
 	})
 
 	router.GET("/shadowrocket", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "shadowrocket.html", gin.H{
-			"domain": config.Config.Domain,
+			"domain": config.Config().Domain,
 		})
 	})
 
 	router.GET("/clash/config", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "clash-config.yaml", gin.H{
-			"domain": config.Config.Domain,
+			"domain": config.Config().Domain,
 		})
 	})
 	router.GET("/clash/localconfig", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "clash-config-local.yaml", gin.H{
-			"port": config.Config.Port,
+			"port": config.Config().Port,
 		})
 	})
 
 	router.GET("/surge/config", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "surge.conf", gin.H{
-			"domain": config.Config.Domain,
+			"domain": config.Config().Domain,
 		})
 	})
 
@@ -430,15 +430,15 @@ func setupRouter() {
 
 func Run() {
 	setupRouter()
-	servePort := config.Config.Port
+	servePort := config.Config().Port
 	envp := os.Getenv("PORT") // environment port for heroku app
 	if envp != "" {
 		servePort = envp
 	}
 	// Run on this server
 	var err error
-	if config.Config.TLSEnable {
-		err = router.RunTLS(":"+servePort, config.Config.CertFile, config.Config.KeyFile)
+	if config.Config().TLSEnable {
+		err = router.RunTLS(":"+servePort, config.Config().CertFile, config.Config().KeyFile)
 	} else {
 		err = router.Run(":" + servePort)
 	}

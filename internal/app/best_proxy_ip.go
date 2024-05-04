@@ -33,7 +33,7 @@ type Format struct {
 }
 
 func CrawlBestNode() {
-	urls := config.Config.SubIpUrl
+	urls := config.Config().SubIpUrl
 	if len(urls) == 0 {
 		log.Errorln("not found sub url")
 		return
@@ -180,7 +180,7 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 
 	var proxyInfo config.ProxyInfo
 
-	_ = copier.Copy(&proxyInfo, &config.Config.ProxyInfo)
+	_ = copier.Copy(&proxyInfo, &config.Config().ProxyInfo)
 
 	for _, node := range bestNodeList {
 
@@ -222,11 +222,6 @@ func filterIpCountry(filter []string, c string) bool {
 }
 
 func checkFormat(format string, distNodeCountry string) (f Format, err error) {
-	err = config.Parse("")
-	if err != nil {
-		log.Errorln("[best_proxy_ip.go] config parse error: %s", err)
-	}
-
 	if strings.Contains(format, "surge") {
 		f.Surge = true
 	} else if strings.Contains(format, "clash") {
@@ -235,22 +230,22 @@ func checkFormat(format string, distNodeCountry string) (f Format, err error) {
 		return f, fmt.Errorf("invaild client format")
 	}
 
-	if _, ok := config.Config.ProxyInfo[distNodeCountry]; !ok {
+	if _, ok := config.Config().ProxyInfo[distNodeCountry]; !ok {
 		return f, fmt.Errorf("not found %s node", distNodeCountry)
 	}
 
 	if strings.Contains(format, "Vmess") {
-		if _, ok := config.Config.ProxyInfo[distNodeCountry]["vmess"]; !ok {
+		if _, ok := config.Config().ProxyInfo[distNodeCountry]["vmess"]; !ok {
 			return f, fmt.Errorf("not found vaild vmess node")
 		}
 		f.Vmess = true
 	} else if strings.Contains(format, "Trojan") {
-		if _, ok := config.Config.ProxyInfo[distNodeCountry]["trojan"]; !ok {
+		if _, ok := config.Config().ProxyInfo[distNodeCountry]["trojan"]; !ok {
 			return f, fmt.Errorf("not found vaild trojan node")
 		}
 		f.Trojan = true
 	} else if strings.Contains(format, "Vless") {
-		if _, ok := config.Config.ProxyInfo[distNodeCountry]["vless"]; !ok {
+		if _, ok := config.Config().ProxyInfo[distNodeCountry]["vless"]; !ok {
 			return f, fmt.Errorf("not found vaild vless node")
 		}
 		f.Vless = true

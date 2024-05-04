@@ -20,7 +20,7 @@ func InitConfigAndGetters(path string) (err error) {
 	if err != nil {
 		return
 	}
-	if s := config.Config.SourceFiles; len(s) == 0 {
+	if s := config.Config().SourceFiles; len(s) == 0 {
 		return errors.New("no sources")
 	} else {
 		initGetters(s)

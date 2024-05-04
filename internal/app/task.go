@@ -166,7 +166,7 @@ func CrawlGo() {
 	// database.SaveBlockProxyList(healthcheck.ProxyInvalidStats)
 	database.ClearOldItems()
 
-	log.Infoln("Usablility checking done. Open %s to check", config.Config.Domain+":"+config.Config.Port)
+	log.Infoln("Usablility checking done. Open %s to check", config.Config().Domain+":"+config.Config().Port)
 
 	// 测速
 	speedTestNew(proxies)
@@ -189,12 +189,12 @@ func CrawlGo() {
 
 // Speed test for new proxies
 func speedTestNew(proxies proxy.ProxyList) {
-	if config.Config.SpeedTest {
+	if config.Config().SpeedTest {
 		cache.IsSpeedTest = "已开启"
-		if config.Config.Timeout > 0 {
-			healthcheck.SpeedTimeout = time.Second * time.Duration(config.Config.Timeout)
+		if config.Config().Timeout > 0 {
+			healthcheck.SpeedTimeout = time.Second * time.Duration(config.Config().Timeout)
 		}
-		healthcheck.SpeedTestNewWithWorkpool(proxies, config.Config.Connection)
+		healthcheck.SpeedTestNewWithWorkpool(proxies, config.Config().Connection)
 	} else {
 		cache.IsSpeedTest = "未开启"
 	}
@@ -202,12 +202,12 @@ func speedTestNew(proxies proxy.ProxyList) {
 
 // Speed test for all proxies in proxy.ProxyList
 func SpeedTest(proxies proxy.ProxyList) {
-	if config.Config.SpeedTest {
+	if config.Config().SpeedTest {
 		cache.IsSpeedTest = "已开启"
-		if config.Config.Timeout > 0 {
-			healthcheck.SpeedTimeout = time.Second * time.Duration(config.Config.Timeout)
+		if config.Config().Timeout > 0 {
+			healthcheck.SpeedTimeout = time.Second * time.Duration(config.Config().Timeout)
 		}
-		healthcheck.SpeedTestAllWithWorkpool(proxies, config.Config.Connection)
+		healthcheck.SpeedTestAllWithWorkpool(proxies, config.Config().Connection)
 	} else {
 		cache.IsSpeedTest = "未开启"
 	}

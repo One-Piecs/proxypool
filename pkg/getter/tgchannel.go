@@ -64,7 +64,7 @@ func NewTGChannelGetter(options tool.Options) (getter Getter, err error) {
 			Url:       "https://t.me/s/" + url,
 			// apiUrl:    "https://tg.i-c-a.su/rss/" + url,
 			// apiUrl: conf.Config.TgChannelProxyUrl + url,
-			apiUrl:   conf.Config.TgChannelProxyUrl + url + fmt.Sprintf(`?limit=%d`, t),
+			apiUrl:   conf.Config().TgChannelProxyUrl + url + fmt.Sprintf(`?limit=%d`, t),
 			onlyFile: only_file,
 		}, nil
 	}

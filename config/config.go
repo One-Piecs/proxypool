@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync/atomic"
 
 	"github.com/One-Piecs/proxypool/pkg/tool"
 	"github.com/ghodss/yaml"
@@ -40,8 +41,16 @@ type ConfigOptions struct {
 	ProxyInfo           ProxyInfo `json:"proxy_info" yaml:"proxy_info"`
 }
 
+var gCfg atomic.Value
+
 // Config 配置
-var Config ConfigOptions
+// var Config ConfigOptions
+func Config() *ConfigOptions {
+	if v := gCfg.Load(); v != nil {
+		return v.(*ConfigOptions)
+	}
+	return &ConfigOptions{}
+}
 
 // Parse 解析配置文件，支持本地文件系统和网络链接
 func Parse(path string) error {
@@ -54,57 +63,59 @@ func Parse(path string) error {
 	if err != nil {
 		return err
 	}
-	Config = ConfigOptions{}
-	err = yaml.Unmarshal(fileData, &Config)
+	cfg := ConfigOptions{}
+	err = yaml.Unmarshal(fileData, &cfg)
 	if err != nil {
 		return err
 	}
 
 	// set default
-	if Config.Connection <= 0 {
-		Config.Connection = 5
+	if cfg.Connection <= 0 {
+		cfg.Connection = 5
 	}
-	if Config.Port == "" {
-		Config.Port = "12580"
+	if cfg.Port == "" {
+		cfg.Port = "12580"
 	}
-	if Config.CrawlInterval == 0 {
-		Config.CrawlInterval = 60
+	if cfg.CrawlInterval == 0 {
+		cfg.CrawlInterval = 60
 	}
-	if Config.SpeedTestInterval == 0 {
-		Config.SpeedTestInterval = 720
+	if cfg.SpeedTestInterval == 0 {
+		cfg.SpeedTestInterval = 720
 	}
-	if Config.ActiveInterval == 0 {
-		Config.ActiveInterval = 60
+	if cfg.ActiveInterval == 0 {
+		cfg.ActiveInterval = 60
 	}
-	if Config.ActiveFrequency == 0 {
-		Config.ActiveFrequency = 100
+	if cfg.ActiveFrequency == 0 {
+		cfg.ActiveFrequency = 100
 	}
-	if Config.ActiveMaxNumber == 0 {
-		Config.ActiveMaxNumber = 100
-	}
-
-	if Config.V2WsHeaderUserAgent == "" {
-		Config.V2WsHeaderUserAgent = "user-agent:Mozilla/5.0 (iPhone; CPU iPhone OS 13_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.1 Mobile/15E148 Safari/604.1"
+	if cfg.ActiveMaxNumber == 0 {
+		cfg.ActiveMaxNumber = 100
 	}
 
-	if Config.GeoipDbUrl == "" {
-		Config.GeoipDbUrl = "https://cdn.jsdelivr.net/gh/alecthw/mmdb_china_ip_list@release/"
+	if cfg.V2WsHeaderUserAgent == "" {
+		cfg.V2WsHeaderUserAgent = "user-agent:Mozilla/5.0 (iPhone; CPU iPhone OS 13_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.1 Mobile/15E148 Safari/604.1"
 	}
 
-	if Config.SubBestNodeInterval == 0 {
-		Config.SubBestNodeInterval = 60
+	if cfg.GeoipDbUrl == "" {
+		cfg.GeoipDbUrl = "https://cdn.jsdelivr.net/gh/alecthw/mmdb_china_ip_list@release/"
+	}
+
+	if cfg.SubBestNodeInterval == 0 {
+		cfg.SubBestNodeInterval = 60
 	}
 
 	// 部分配置环境变量优先
 	if domain := os.Getenv("DOMAIN"); domain != "" {
-		Config.Domain = domain
+		cfg.Domain = domain
 	}
 	if cfEmail := os.Getenv("CF_API_EMAIL"); cfEmail != "" {
-		Config.CFEmail = cfEmail
+		cfg.CFEmail = cfEmail
 	}
 	if cfKey := os.Getenv("CF_API_KEY"); cfKey != "" {
-		Config.CFKey = cfKey
+		cfg.CFKey = cfKey
 	}
+
+	gCfg.Store(&cfg)
 
 	return nil
 }

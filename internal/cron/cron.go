@@ -14,11 +14,11 @@ import (
 )
 
 func Cron() {
-	_ = gocron.Every(config.Config.CrawlInterval).Minutes().Do(crawlTask)
-	_ = gocron.Every(config.Config.SpeedTestInterval).Minutes().Do(speedTestTask)
-	_ = gocron.Every(config.Config.ActiveInterval).Minutes().Do(frequentSpeedTestTask)
+	_ = gocron.Every(config.Config().CrawlInterval).Minutes().Do(crawlTask)
+	_ = gocron.Every(config.Config().SpeedTestInterval).Minutes().Do(speedTestTask)
+	_ = gocron.Every(config.Config().ActiveInterval).Minutes().Do(frequentSpeedTestTask)
 	_ = gocron.Every(1).Day().At("04:30").Do(geoIp.UpdateGeoIP)
-	_ = gocron.Every(config.Config.SubBestNodeInterval).Minutes().Do(CrawlBestNodeTask)
+	_ = gocron.Every(config.Config().SubBestNodeInterval).Minutes().Do(CrawlBestNodeTask)
 	<-gocron.Start()
 }
 
@@ -66,9 +66,9 @@ func frequentSpeedTestTask() {
 		log.Errorln("[cron.go] config parse error: %s", err)
 	}
 	pl_all := cache.GetProxies("proxies")
-	pl := healthcheck.ProxyStats.ReqCountThan(config.Config.ActiveFrequency, pl_all, true)
-	if len(pl) > int(config.Config.ActiveMaxNumber) {
-		pl = healthcheck.ProxyStats.SortProxiesBySpeed(pl)[:config.Config.ActiveMaxNumber]
+	pl := healthcheck.ProxyStats.ReqCountThan(config.Config().ActiveFrequency, pl_all, true)
+	if len(pl) > int(config.Config().ActiveMaxNumber) {
+		pl = healthcheck.ProxyStats.SortProxiesBySpeed(pl)[:config.Config().ActiveMaxNumber]
 	}
 	log.Infoln("Active proxies count: %d", len(pl))
 
