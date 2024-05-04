@@ -91,6 +91,10 @@ func Parse(path string) error {
 		Config.GeoipDbUrl = "https://cdn.jsdelivr.net/gh/alecthw/mmdb_china_ip_list@release/"
 	}
 
+	if Config.SubBestNodeInterval == 0 {
+		Config.SubBestNodeInterval = 60
+	}
+
 	// 部分配置环境变量优先
 	if domain := os.Getenv("DOMAIN"); domain != "" {
 		Config.Domain = domain
