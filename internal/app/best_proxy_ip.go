@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jinzhu/copier"
+
 	"github.com/One-Piecs/proxypool/internal/cache"
 
 	"github.com/One-Piecs/proxypool/config"
@@ -176,6 +178,10 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 
 	proxyCountryIsoCodeList := strings.Split(proxyCountryIsoCode, ",")
 
+	var proxyInfo config.ProxyInfo
+
+	_ = copier.Copy(&proxyInfo, &config.Config.ProxyInfo)
+
 	for _, node := range bestNodeList {
 
 		if !filterIpCountry(proxyCountryIsoCodeList, node.Country) {
@@ -184,17 +190,17 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 
 		if f.Surge {
 			if f.Vmess {
-				genSurgeVmessUrl(&buf, distNodeCountry, node.Country, node.Ip, node.Port)
+				genSurgeVmessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
 			} else if f.Trojan {
-				genSurgeTrojanUrl(&buf, distNodeCountry, node.Country, node.Ip, node.Port)
+				genSurgeTrojanUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
 			}
 		} else if f.Clash {
 			if f.Vmess {
-				genClashVmessUrl(&buf, distNodeCountry, node.Country, node.Ip, node.Port)
+				genClashVmessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
 			} else if f.Trojan {
-				genClashTrojanUrl(&buf, distNodeCountry, node.Country, node.Ip, node.Port)
+				genClashTrojanUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
 			} else if f.Vless {
-				genClashVlessUrl(&buf, distNodeCountry, node.Country, node.Ip, node.Port)
+				genClashVlessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
 			}
 		}
 	}
@@ -275,52 +281,52 @@ func removeDuplicateElement(languages []string) []string {
 	return result
 }
 
-func genSurgeVmessUrl(buf *strings.Builder, nodeCountry, country, ip string, port int) {
+func genSurgeVmessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
 	buf.WriteString(fmt.Sprintf(`%s %-15s = vmess, %-15s, %d, username=%v, sni=%v, ws=true, ws-path=%v, ws-headers=Ip:"%v", vmess-aead=true, tls=true
 `,
 		country, ip, ip, port,
-		config.Config.ProxyInfo[nodeCountry]["vmess"]["uuid"],
-		config.Config.ProxyInfo[nodeCountry]["vmess"]["host"],
-		config.Config.ProxyInfo[nodeCountry]["vmess"]["path"],
-		config.Config.ProxyInfo[nodeCountry]["vmess"]["host"]))
+		proxyInfo[nodeCountry]["vmess"]["uuid"],
+		proxyInfo[nodeCountry]["vmess"]["host"],
+		proxyInfo[nodeCountry]["vmess"]["path"],
+		proxyInfo[nodeCountry]["vmess"]["host"]))
 }
 
-func genSurgeTrojanUrl(buf *strings.Builder, nodeCountry, country, ip string, port int) {
+func genSurgeTrojanUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
 	buf.WriteString(fmt.Sprintf(`%s %-15s = trojan, %-15s, %d, password=%v, sni=%v, ws=true, ws-path=%v, ws-headers=Ip:"%v"
 `,
 		country, ip, ip, port,
-		config.Config.ProxyInfo[nodeCountry]["trojan"]["password"],
-		config.Config.ProxyInfo[nodeCountry]["trojan"]["host"],
-		config.Config.ProxyInfo[nodeCountry]["trojan"]["path"],
-		config.Config.ProxyInfo[nodeCountry]["trojan"]["host"]))
+		proxyInfo[nodeCountry]["trojan"]["password"],
+		proxyInfo[nodeCountry]["trojan"]["host"],
+		proxyInfo[nodeCountry]["trojan"]["path"],
+		proxyInfo[nodeCountry]["trojan"]["host"]))
 }
 
-func genClashVlessUrl(buf *strings.Builder, nodeCountry, country, ip string, port int) {
+func genClashVlessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
 	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %-15s", "type":"vless", "server":"%s", "port":%d, "uuid":"%v", "network":"ws", "tls":true, "udp":true, "sni":"%v", "client-fingerprint":"chrome", "ws-opts":{"path":"%v", "headers":{"Ip":"%v"}}}
 `,
 		country, ip, ip, port,
-		config.Config.ProxyInfo[nodeCountry]["vless"]["uuid"],
-		config.Config.ProxyInfo[nodeCountry]["vless"]["host"],
-		config.Config.ProxyInfo[nodeCountry]["vless"]["path"],
-		config.Config.ProxyInfo[nodeCountry]["vless"]["host"]))
+		proxyInfo[nodeCountry]["vless"]["uuid"],
+		proxyInfo[nodeCountry]["vless"]["host"],
+		proxyInfo[nodeCountry]["vless"]["path"],
+		proxyInfo[nodeCountry]["vless"]["host"]))
 }
 
-func genClashVmessUrl(buf *strings.Builder, nodeCountry, country, ip string, port int) {
+func genClashVmessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
 	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %-15s", "type":"vmess", "server":"%s", "port":%d, "uuid":"%v", "tls":true, "cipher":"none", "alterId":0, "network":"ws", "ws-opts":{"path":"%v", "headers":{"Ip":"%v"}}, "servername":"%v"}
 `,
 		country, ip, ip, port,
-		config.Config.ProxyInfo[nodeCountry]["vmess"]["uuid"],
-		config.Config.ProxyInfo[nodeCountry]["vmess"]["path"],
-		config.Config.ProxyInfo[nodeCountry]["vmess"]["host"],
-		config.Config.ProxyInfo[nodeCountry]["vmess"]["host"]))
+		proxyInfo[nodeCountry]["vmess"]["uuid"],
+		proxyInfo[nodeCountry]["vmess"]["path"],
+		proxyInfo[nodeCountry]["vmess"]["host"],
+		proxyInfo[nodeCountry]["vmess"]["host"]))
 }
 
-func genClashTrojanUrl(buf *strings.Builder, node_country, country, ip string, port int) {
+func genClashTrojanUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, node_country, country, ip string, port int) {
 	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %-15.15s", "type":"trojan", "server":"%s", "port":%d, "password":"%v", "sni":"%v", "network":"ws", "ws-opts":{"path":"%v", "headers":{"Ip":"%v"}}}
 `,
 		country, ip, ip, port,
-		config.Config.ProxyInfo[node_country]["trojan"]["password"],
-		config.Config.ProxyInfo[node_country]["trojan"]["host"],
-		config.Config.ProxyInfo[node_country]["trojan"]["path"],
-		config.Config.ProxyInfo[node_country]["trojan"]["host"]))
+		proxyInfo[node_country]["trojan"]["password"],
+		proxyInfo[node_country]["trojan"]["host"],
+		proxyInfo[node_country]["trojan"]["path"],
+		proxyInfo[node_country]["trojan"]["host"]))
 }
