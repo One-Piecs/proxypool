@@ -4,12 +4,15 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/One-Piecs/proxypool/internal/cache"
 
 	"github.com/One-Piecs/proxypool/config"
 
@@ -27,18 +30,16 @@ type Format struct {
 	Vless  bool
 }
 
-func SubNiceProxyIp(format string, distNodeCountry string) (s string, err error) {
-	f, err := checkFormat(format, distNodeCountry)
-	if err != nil {
-		return "", err
-	}
-
+func CrawlBestNode() {
 	urls := config.Config.SubIpUrl
 	if len(urls) == 0 {
-		return "", fmt.Errorf("not found sub url")
+		log.Errorln("not found sub url")
+		return
 	}
 
-	addrAll := make([]string, 0, 100)
+	addrAll := make([]string, 0, 200)
+
+	bestNodeList := make([]cache.BestNode, 0, 200)
 
 	chn := make(chan []string, len(urls))
 	wg := &sync.WaitGroup{}
@@ -51,8 +52,8 @@ func SubNiceProxyIp(format string, distNodeCountry string) (s string, err error)
 
 			resp, err := resty.New().R().
 				SetQueryParams(map[string]string{
-					"host":       "fake.com",
-					"uuid":       "uuid",
+					"host":       "p.laibbb.top",
+					"uuid":       "e4e08238-e42c-4288-8f67-e2994ec18c90",
 					"path":       "/webhook",
 					"edgetunnel": "cmliu",
 				}).
@@ -66,7 +67,7 @@ func SubNiceProxyIp(format string, distNodeCountry string) (s string, err error)
 			}
 			de64, err := base64.StdEncoding.DecodeString(resp.String())
 			if err != nil {
-				log.Errorln("base64.StdEncoding.DecodeString(): %s", err.Error())
+				log.Errorln("url[%s] base64.StdEncoding.DecodeString(): %s", url, err.Error())
 				chn <- list
 				wg.Done()
 				return
@@ -75,9 +76,9 @@ func SubNiceProxyIp(format string, distNodeCountry string) (s string, err error)
 			r := bufio.NewScanner(bytes.NewReader(de64))
 
 			for r.Scan() {
-				addr, err := ExtractHostPort2(r.Text())
+				addr, err := ExtractHostPort(r.Text())
 				if err != nil {
-					log.Errorln("ExtractHostPort2: %s", err.Error())
+					log.Errorln("ExtractHostPort: %s", err.Error())
 					continue
 				}
 				list = append(list, addr)
@@ -102,6 +103,64 @@ func SubNiceProxyIp(format string, distNodeCountry string) (s string, err error)
 	}
 
 	addrAll = removeDuplicateElement(addrAll)
+	var err error
+	for _, addr := range addrAll {
+		ip := ""
+		port := 0
+		h := strings.Split(addr, "]:")
+		if len(h) == 2 {
+			// ipv6
+			ip = strings.ReplaceAll(h[0], "[", "")
+			port, err = strconv.Atoi(h[1])
+			if err != nil {
+				log.Errorln("strconv.Atoi(h[1]): %s", err.Error())
+				continue
+			}
+		} else {
+			// ipv4
+			h := strings.Split(addr, ":")
+			if len(h) != 2 {
+				log.Errorln("invalid addr: %s", addr)
+				continue
+			}
+			ip = h[0]
+			port, err = strconv.Atoi(h[1])
+			if err != nil {
+				log.Errorln("strconv.Atoi(h[1]): %s", err.Error())
+				continue
+			}
+		}
+
+		if ip == "cf.090227.xyz" {
+			continue
+		}
+
+		_, country, err := geoIp.GeoIpDB.Find(ip)
+		if err != nil {
+			log.Errorln(err.Error())
+			continue
+		}
+
+		bestNodeList = append(bestNodeList, cache.BestNode{
+			Ip:      ip,
+			Port:    port,
+			Country: country,
+		})
+	}
+
+	cache.SetBestNodeList("bestNode", bestNodeList)
+}
+
+func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode string) (s string, err error) {
+	f, err := checkFormat(format, distNodeCountry)
+	if err != nil {
+		return "", err
+	}
+
+	bestNodeList := cache.GetBestNodeList("bestNode")
+	if bestNodeList == nil || len(bestNodeList) == 0 {
+		return "", errors.New("not found best node list")
+	}
 
 	buf := strings.Builder{}
 	switch format {
@@ -114,58 +173,45 @@ func SubNiceProxyIp(format string, distNodeCountry string) (s string, err error)
 		return "", fmt.Errorf("invalid format: %s", format)
 	}
 
-	for _, addr := range addrAll {
-		host := ""
-		port := 0
-		h := strings.Split(addr, "]:")
-		if len(h) == 2 {
-			// ipv6
-			host = strings.ReplaceAll(h[0], "[", "")
-			port, err = strconv.Atoi(h[1])
-			if err != nil {
-				log.Errorln("strconv.Atoi(h[1]): %s", err.Error())
-				continue
-			}
-		} else {
-			// ipv4
-			h := strings.Split(addr, ":")
-			host = h[0]
-			port, err = strconv.Atoi(h[1])
-			if err != nil {
-				log.Errorln("strconv.Atoi(h[1]): %s", err.Error())
-				continue
-			}
-		}
+	proxyCountryIsoCodeList := strings.Split(proxyCountryIsoCode, ",")
 
-		if host == "cf.090227.xyz" {
-			continue
-		}
+	for _, node := range bestNodeList {
 
-		_, country, err := geoIp.GeoIpDB.Find(host)
-		if err != nil {
-			log.Errorln(err.Error())
+		if !filterIpCountry(proxyCountryIsoCodeList, node.Country) {
 			continue
 		}
 
 		if f.Surge {
 			if f.Vmess {
-				genSurgeVmessUrl(&buf, distNodeCountry, country, host, port)
+				genSurgeVmessUrl(&buf, distNodeCountry, node.Country, node.Ip, node.Port)
 			} else if f.Trojan {
-				genSurgeTrojanUrl(&buf, distNodeCountry, country, host, port)
+				genSurgeTrojanUrl(&buf, distNodeCountry, node.Country, node.Ip, node.Port)
 			}
 		} else if f.Clash {
 			if f.Vmess {
-				genClashVmessUrl(&buf, distNodeCountry, country, host, port)
+				genClashVmessUrl(&buf, distNodeCountry, node.Country, node.Ip, node.Port)
 			} else if f.Trojan {
-				genClashTrojanUrl(&buf, distNodeCountry, country, host, port)
+				genClashTrojanUrl(&buf, distNodeCountry, node.Country, node.Ip, node.Port)
 			} else if f.Vless {
-				genClashVlessUrl(&buf, distNodeCountry, country, host, port)
+				genClashVlessUrl(&buf, distNodeCountry, node.Country, node.Ip, node.Port)
 			}
 		}
-
 	}
 
 	return buf.String(), nil
+}
+
+func filterIpCountry(filter []string, c string) bool {
+	if len(filter) == 0 || filter[0] == "" {
+		return true
+	}
+	for _, f := range filter {
+		if strings.Contains(c, f) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func checkFormat(format string, distNodeCountry string) (f Format, err error) {
@@ -207,33 +253,7 @@ func checkFormat(format string, distNodeCountry string) (f Format, err error) {
 	return f, nil
 }
 
-func ExtractHostPort(link string) (host string, port int, err error) {
-	u, err := url.Parse(link)
-	if err != nil {
-		return "", 0, err
-	}
-
-	h := strings.Split(u.Host, "]:")
-	if len(h) == 2 {
-		// ipv6
-		host = strings.ReplaceAll(h[0], "[", "")
-		port, err = strconv.Atoi(h[1])
-		if err != nil {
-			return "", 0, err
-		}
-		return host, port, nil
-	} else {
-		// ipv4
-		h := strings.Split(u.Host, ":")
-		port, err = strconv.Atoi(h[1])
-		if err != nil {
-			return "", 0, err
-		}
-		return h[0], port, nil
-	}
-}
-
-func ExtractHostPort2(link string) (addr string, err error) {
+func ExtractHostPort(link string) (addr string, err error) {
 	u, err := url.Parse(link)
 	if err != nil {
 		return "", err
@@ -255,7 +275,7 @@ func removeDuplicateElement(languages []string) []string {
 }
 
 func genSurgeVmessUrl(buf *strings.Builder, nodeCountry, country, ip string, port int) {
-	buf.WriteString(fmt.Sprintf(`%s %-15s = vmess, %-15s, %d, username=%v, sni=%v, ws=true, ws-path=%v, ws-headers=Host:"%v", vmess-aead=true, tls=true
+	buf.WriteString(fmt.Sprintf(`%s %-15s = vmess, %-15s, %d, username=%v, sni=%v, ws=true, ws-path=%v, ws-headers=Ip:"%v", vmess-aead=true, tls=true
 `,
 		country, ip, ip, port,
 		config.Config.ProxyInfo[nodeCountry]["vmess"]["uuid"],
@@ -265,7 +285,7 @@ func genSurgeVmessUrl(buf *strings.Builder, nodeCountry, country, ip string, por
 }
 
 func genSurgeTrojanUrl(buf *strings.Builder, nodeCountry, country, ip string, port int) {
-	buf.WriteString(fmt.Sprintf(`%s %-15s = trojan, %-15s, %d, password=%v, sni=%v, ws=true, ws-path=%v, ws-headers=Host:"%v"
+	buf.WriteString(fmt.Sprintf(`%s %-15s = trojan, %-15s, %d, password=%v, sni=%v, ws=true, ws-path=%v, ws-headers=Ip:"%v"
 `,
 		country, ip, ip, port,
 		config.Config.ProxyInfo[nodeCountry]["trojan"]["password"],
@@ -275,7 +295,7 @@ func genSurgeTrojanUrl(buf *strings.Builder, nodeCountry, country, ip string, po
 }
 
 func genClashVlessUrl(buf *strings.Builder, nodeCountry, country, ip string, port int) {
-	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %-15s", "type":"vless", "server":"%s", "port":%d, "uuid":"%v", "network":"ws", "tls":true, "udp":true, "sni":"%v", "client-fingerprint":"chrome", "ws-opts":{"path":"%v", "headers":{"Host":"%v"}}}
+	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %-15s", "type":"vless", "server":"%s", "port":%d, "uuid":"%v", "network":"ws", "tls":true, "udp":true, "sni":"%v", "client-fingerprint":"chrome", "ws-opts":{"path":"%v", "headers":{"Ip":"%v"}}}
 `,
 		country, ip, ip, port,
 		config.Config.ProxyInfo[nodeCountry]["vless"]["uuid"],
@@ -285,7 +305,7 @@ func genClashVlessUrl(buf *strings.Builder, nodeCountry, country, ip string, por
 }
 
 func genClashVmessUrl(buf *strings.Builder, nodeCountry, country, ip string, port int) {
-	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %-15s", "type":"vmess", "server":"%s", "port":%d, "uuid":"%v", "tls":true, "cipher":"none", "alterId":0, "network":"ws", "ws-opts":{"path":"%v", "headers":{"Host":"%v"}}, "servername":"%v"}
+	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %-15s", "type":"vmess", "server":"%s", "port":%d, "uuid":"%v", "tls":true, "cipher":"none", "alterId":0, "network":"ws", "ws-opts":{"path":"%v", "headers":{"Ip":"%v"}}, "servername":"%v"}
 `,
 		country, ip, ip, port,
 		config.Config.ProxyInfo[nodeCountry]["vmess"]["uuid"],
@@ -295,7 +315,7 @@ func genClashVmessUrl(buf *strings.Builder, nodeCountry, country, ip string, por
 }
 
 func genClashTrojanUrl(buf *strings.Builder, node_country, country, ip string, port int) {
-	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %-15.15s", "type":"trojan", "server":"%s", "port":%d, "password":"%v", "sni":"%v", "network":"ws", "ws-opts":{"path":"%v", "headers":{"Host":"%v"}}}
+	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %-15.15s", "type":"trojan", "server":"%s", "port":%d, "password":"%v", "sni":"%v", "network":"ws", "ws-opts":{"path":"%v", "headers":{"Ip":"%v"}}}
 `,
 		country, ip, ip, port,
 		config.Config.ProxyInfo[node_country]["trojan"]["password"],

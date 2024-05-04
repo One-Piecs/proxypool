@@ -301,12 +301,12 @@ func ParseVmessLink(link string) (*Vmess, error) {
 		} else { // when http h2
 			network = obfs
 		}
-		// HTTP Object: Host <- obfsParam=www.036452916.xyz
+		// HTTP Object: Ip <- obfsParam=www.036452916.xyz
 		host := moreInfo.Get("obfsParam")
 		if host != "" {
 			switch obfs {
 			case "websocket":
-				wsHeaders["Host"] = host
+				wsHeaders["Ip"] = host
 			case "h2":
 				h2Opt.Host = append(h2Opt.Host, host)
 			}

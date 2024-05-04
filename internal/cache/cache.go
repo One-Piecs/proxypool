@@ -7,6 +7,12 @@ import (
 	"github.com/patrickmn/go-cache"
 )
 
+type BestNode struct {
+	Ip      string
+	Port    int
+	Country string
+}
+
 var c = cache.New(cache.NoExpiration, 10*time.Minute)
 
 func GetProxies(key string) proxy.ProxyList {
@@ -31,4 +37,16 @@ func GetString(key string) string {
 		return result.(string)
 	}
 	return ""
+}
+
+func SetBestNodeList(key string, value []BestNode) {
+	c.Set(key, value, cache.NoExpiration)
+}
+
+func GetBestNodeList(key string) (value []BestNode) {
+	result, found := c.Get(key)
+	if found {
+		return result.([]BestNode)
+	}
+	return nil
 }

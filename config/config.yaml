@@ -46,6 +46,8 @@ v2_ws_header_user_agent: "user-agent:Mozilla/5.0 (iPhone; CPU iPhone OS 13_5 lik
 geoip_db_url: "https://raw.githubusercontent.com/alecthw/mmdb_china_ip_list/release/"
 
 
+sub-best-node-interval: 60 # default 60 (min)
+
 sub_ip_url:
   - "https://VLESS.xxxxx.com/sub"
 

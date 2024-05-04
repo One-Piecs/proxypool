@@ -398,11 +398,11 @@ func setupRouter() {
 		}
 
 		format := c.Param("format")
-		country := c.Query("c")
-		if country == "" {
-			country = "JP"
+		distNodeCountry := c.Query("d")
+		if distNodeCountry == "" {
+			distNodeCountry = "JP"
 		}
-		text, err := app.SubNiceProxyIp(format, country)
+		text, err := app.SubNiceProxyIp(format, distNodeCountry, c.Query("c"))
 		if err != nil {
 			c.String(500, err.Error())
 			return
@@ -419,7 +419,7 @@ func setupRouter() {
 		}
 
 		format := c.Param("format")
-		text, err := app.SubNiceProxyIp(format, "KR")
+		text, err := app.SubNiceProxyIp(format, "KR", c.Query("c"))
 		if err != nil {
 			c.String(500, err.Error())
 			return

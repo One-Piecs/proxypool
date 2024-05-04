@@ -18,6 +18,7 @@ func Cron() {
 	_ = gocron.Every(config.Config.SpeedTestInterval).Minutes().Do(speedTestTask)
 	_ = gocron.Every(config.Config.ActiveInterval).Minutes().Do(frequentSpeedTestTask)
 	_ = gocron.Every(1).Day().At("04:30").Do(geoIp.UpdateGeoIP)
+	_ = gocron.Every(config.Config.SubBestNodeInterval).Minutes().Do(CrawlBestNodeTask)
 	<-gocron.Start()
 }
 
@@ -87,5 +88,16 @@ func frequentSpeedTestTask() {
 			Proxies: &pl_all,
 		},
 	}.Provide())
+	runtime.GC()
+}
+
+func CrawlBestNodeTask() {
+	log.Infoln("Doing CrawlBestNodeTask ...")
+	err := config.Parse("")
+	if err != nil {
+		log.Errorln("[cron.go] config parse error: %s", err)
+		return
+	}
+	app.CrawlBestNode()
 	runtime.GC()
 }
