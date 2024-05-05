@@ -351,7 +351,7 @@ func genQuanXVlessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCoun
 }
 
 func genQuanXVmessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
-	buf.WriteString(fmt.Sprintf(`vmess = %s:%d, method=none, password=%s, obfs=wss, obfs-uri=%s, obfs-host=%s, tls-host=%s, aead=true, tag=%s %s
+	buf.WriteString(fmt.Sprintf(`vmess = %s:%d, method=chacha20-ietf-poly1305, password=%s, obfs=wss, obfs-uri=%s, obfs-host=%s, tls-host=%s, aead=true, udp-relay=true, tag=%s %s
 `,
 		ip, port,
 		proxyInfo[nodeCountry]["vless"]["uuid"],
@@ -362,7 +362,7 @@ func genQuanXVmessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCoun
 }
 
 func genQuanXTrojanUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
-	buf.WriteString(fmt.Sprintf(`trojan = %s:%d, password=%s, obfs=wss, obfs-uri=%s, obfs-host=%s, tls-host=%s, tag=%s %s 
+	buf.WriteString(fmt.Sprintf(`trojan = %s:%d, password=%s, obfs=wss, obfs-uri=%s, obfs-host=%s, tls-host=%s, udp-relay=true, tag=%s %s 
 `,
 		ip, port,
 		proxyInfo[nodeCountry]["trojan"]["password"],
