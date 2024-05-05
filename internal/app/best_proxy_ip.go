@@ -28,6 +28,7 @@ type Format struct {
 	Surge  bool
 	Clash  bool
 	QuanX  bool
+	Loon   bool
 	Vmess  bool
 	Trojan bool
 	Vless  bool
@@ -162,20 +163,15 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 	}
 
 	bestNodeList := cache.GetBestNodeList("bestNode")
-	if bestNodeList == nil || len(bestNodeList) == 0 {
+	if len(bestNodeList) == 0 {
 		return "", errors.New("not found best node list")
 	}
 
 	buf := strings.Builder{}
 	buf.WriteString("# " + cache.GetString("bestNodeLastUpdateTime") + "\n")
 
-	switch format {
-	case "surgeVmess", "surgeTrojan":
-	case "quanxVmess", "quanxTrojan", "quanxVless":
-	case "clashVmess", "clashTrojan", "clashVless":
+	if f.Clash {
 		buf.WriteString("proxies:\n")
-	default:
-		return "", fmt.Errorf("invalid format: %s", format)
 	}
 
 	proxyCountryIsoCodeList := strings.Split(proxyCountryIsoCode, ",")
@@ -212,6 +208,14 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 			} else if f.Vless {
 				genQuanXVlessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
 			}
+		} else if f.Loon {
+			if f.Vmess {
+				genLoonVmessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
+			} else if f.Trojan {
+				genLoonTrojanUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
+			} else if f.Vless {
+				genLoonVlessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
+			}
 		}
 
 	}
@@ -239,6 +243,8 @@ func checkFormat(format string, distNodeCountry string) (f Format, err error) {
 		f.Clash = true
 	} else if strings.Contains(format, "quanx") {
 		f.QuanX = true
+	} else if strings.Contains(format, "loon") {
+		f.Loon = true
 	} else {
 		return f, fmt.Errorf("invaild client format")
 	}
@@ -330,7 +336,7 @@ func genClashVmessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCoun
 }
 
 func genClashTrojanUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, node_country, country, ip string, port int) {
-	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %-15.15s", "type":"trojan", "server":"%s", "port":%d, "password":"%v", "sni":"%v", "network":"ws", "ws-opts":{"path":"%v", "headers":{"Host":"%v"}}}
+	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %-15s", "type":"trojan", "server":"%s", "port":%d, "password":"%v", "sni":"%v", "network":"ws", "ws-opts":{"path":"%v", "headers":{"Host":"%v"}}}
 `,
 		country, ip, ip, port,
 		proxyInfo[node_country]["trojan"]["password"],
@@ -370,4 +376,40 @@ func genQuanXTrojanUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCou
 		proxyInfo[nodeCountry]["trojan"]["host"],
 		proxyInfo[nodeCountry]["trojan"]["host"],
 		country, ip))
+}
+
+func genLoonVlessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`%s %-15s = vless, %s, %d, "%s", transport=ws, path=%s, host=%s, udp=true, over-tls=true, sni=%s
+`,
+		country, ip,
+		ip, port,
+		proxyInfo[nodeCountry]["vless"]["uuid"],
+		proxyInfo[nodeCountry]["vless"]["path"],
+		proxyInfo[nodeCountry]["vless"]["host"],
+		proxyInfo[nodeCountry]["vless"]["host"],
+	))
+}
+
+func genLoonVmessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`%s %-15s = vmess, %s, %d, none, "%s", transport=ws, alterId=0, path=%s, host=%s, udp=true, over-tls=true, sni=%s
+`,
+		country, ip,
+		ip, port,
+		proxyInfo[nodeCountry]["vmess"]["uuid"],
+		proxyInfo[nodeCountry]["vmess"]["path"],
+		proxyInfo[nodeCountry]["vmess"]["host"],
+		proxyInfo[nodeCountry]["vmess"]["host"],
+	))
+}
+
+func genLoonTrojanUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`%s %-15s = trojan, %s, %d, "%s", transport=ws, sni=%s, path=%s, host=%s, udp=true
+`,
+		country, ip,
+		ip, port,
+		proxyInfo[nodeCountry]["trojan"]["password"],
+		proxyInfo[nodeCountry]["trojan"]["host"],
+		proxyInfo[nodeCountry]["trojan"]["path"],
+		proxyInfo[nodeCountry]["trojan"]["host"],
+	))
 }
