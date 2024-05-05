@@ -354,10 +354,10 @@ func genQuanXVmessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCoun
 	buf.WriteString(fmt.Sprintf(`vmess = %s:%d, method=chacha20-ietf-poly1305, password=%s, obfs=wss, obfs-uri=%s, obfs-host=%s, tls-host=%s, aead=true, udp-relay=true, tag=%s %s
 `,
 		ip, port,
-		proxyInfo[nodeCountry]["vless"]["uuid"],
-		proxyInfo[nodeCountry]["vless"]["path"],
-		proxyInfo[nodeCountry]["vless"]["host"],
-		proxyInfo[nodeCountry]["vless"]["host"],
+		proxyInfo[nodeCountry]["vmess"]["uuid"],
+		proxyInfo[nodeCountry]["vmess"]["path"],
+		proxyInfo[nodeCountry]["vmess"]["host"],
+		proxyInfo[nodeCountry]["vmess"]["host"],
 		country, ip))
 }
 
