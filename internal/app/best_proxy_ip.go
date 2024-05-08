@@ -107,7 +107,12 @@ func CrawlBestNode() {
 		}
 	}
 
+	log.Infoln("sub addrAll count: %d", len(addrAll))
+
 	addrAll = removeDuplicateElement(addrAll)
+
+	log.Infoln("sub addrAll removeDuplicateElement count: %d", len(addrAll))
+
 	var err error
 	for _, addr := range addrAll {
 		ip := ""
