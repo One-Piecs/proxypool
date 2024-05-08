@@ -48,21 +48,22 @@ func CrawlBestNode() {
 	chn := make(chan []string, len(urls))
 	wg := &sync.WaitGroup{}
 
-	for _, url := range urls {
+	for _, _url := range urls {
 		wg.Add(1)
-		go func(url string) {
-			log.Infoln("Starting: %s", url)
+		go func(_url string) {
+			log.Infoln("Starting: %s", _url)
 			list := make([]string, 0, 100)
 
 			resp, err := resty.New().R().
 				SetQueryParams(map[string]string{
 					"host":       "p.laibbb.top",
 					"uuid":       "e4e08238-e42c-4288-8f67-e2994ec18c90",
+					"pw":         "e4e08238",
 					"path":       "/webhook",
 					"edgetunnel": "cmliu",
 				}).
 				SetHeader("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36").
-				Get(url)
+				Get(_url)
 			if err != nil {
 				log.Errorln("resty.Get(): %s", err.Error())
 				chn <- list
@@ -71,7 +72,7 @@ func CrawlBestNode() {
 			}
 			de64, err := base64.StdEncoding.DecodeString(resp.String())
 			if err != nil {
-				log.Errorln("url[%s] base64.StdEncoding.DecodeString(): %s", url, err.Error())
+				log.Errorln("url[%s] base64.StdEncoding.DecodeString(): %s", _url, err.Error())
 				chn <- list
 				wg.Done()
 				return
@@ -90,8 +91,8 @@ func CrawlBestNode() {
 
 			chn <- list
 			wg.Done()
-			log.Infoln("End: %s", url)
-		}(url)
+			log.Infoln("End: %s", _url)
+		}(_url)
 	}
 
 	wg.Wait()
