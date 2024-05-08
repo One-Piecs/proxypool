@@ -91,7 +91,7 @@ func CrawlBestNode() {
 
 			chn <- list
 			wg.Done()
-			log.Infoln("End: %s", _url)
+			log.Infoln("End: %s, count: %d", _url, len(list))
 		}(_url)
 	}
 
