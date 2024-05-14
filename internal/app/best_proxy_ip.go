@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -157,6 +158,11 @@ func CrawlBestNode() {
 			Country: country,
 		})
 	}
+
+	// 排序
+	sort.Slice(bestNodeList, func(i, j int) bool {
+		return bestNodeList[i].Country+bestNodeList[i].Ip < bestNodeList[j].Country+bestNodeList[j].Ip
+	})
 
 	cache.SetBestNodeList("bestNode", bestNodeList)
 	cache.SetString("bestNodeLastUpdateTime", time.Now().Format(time.RFC3339))
