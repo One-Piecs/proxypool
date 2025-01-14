@@ -13,16 +13,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jinzhu/copier"
-
-	"github.com/One-Piecs/proxypool/internal/cache"
-
 	"github.com/One-Piecs/proxypool/config"
-
-	"github.com/One-Piecs/proxypool/pkg/geoIp"
-
+	"github.com/One-Piecs/proxypool/internal/cache"
 	"github.com/One-Piecs/proxypool/log"
+	"github.com/One-Piecs/proxypool/pkg/geoIp"
 	"github.com/go-resty/resty/v2"
+	"github.com/jinzhu/copier"
 )
 
 type Format struct {
@@ -163,6 +159,8 @@ func CrawlBestNode() {
 	sort.Slice(bestNodeList, func(i, j int) bool {
 		return bestNodeList[i].Country+bestNodeList[i].Ip < bestNodeList[j].Country+bestNodeList[j].Ip
 	})
+
+	// 保存到文件
 
 	cache.SetBestNodeList("bestNode", bestNodeList)
 	cache.SetString("bestNodeLastUpdateTime", time.Now().Format(time.RFC3339))
