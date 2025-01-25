@@ -101,3 +101,13 @@ dockerhub:
 	@go mod vendor
 	docker buildx build --platform linux/amd64,linux/arm64/v8 -f Dockerfile -t bineyond/proxypool:$(VERSION) -t bineyond/proxypool:latest .  --push
 	@rm -r vendor
+
+dockerhub-amd64:
+	@go mod vendor
+	docker buildx build --platform linux/amd64 -f Dockerfile -t bineyond/proxypool:amd64 -t bineyond/proxypool:latest .  --push
+	@rm -r vendor
+
+dockerhub-arm64:
+	@go mod vendor
+	docker buildx build --platform linux/arm64/v8 -f Dockerfile -t bineyond/proxypool:arm64 -t bineyond/proxypool:latest .  --push
+	@rm -r vendor
