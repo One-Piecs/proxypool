@@ -93,6 +93,10 @@ func setupRouter() {
 		})
 	})
 
+	router.GET("/health", func(c *gin.Context) {
+		c.String(http.StatusOK, "OK")
+	})
+
 	router.GET("/clash", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "clash.html", gin.H{
 			"domain": config.Config().Domain,
