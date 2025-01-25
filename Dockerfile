@@ -14,7 +14,7 @@ RUN make docker && mv bin/proxypool-docker /proxypool
 
 # ----------------------------
 # 运行阶段
-FROM alpine:3.18
+FROM alpine:3.21
 
 # 安装运行时依赖并清理缓存
 RUN apk add --no-cache ca-certificates tzdata \
