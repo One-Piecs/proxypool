@@ -17,6 +17,7 @@ import (
 	"github.com/One-Piecs/proxypool/internal/cache"
 	"github.com/One-Piecs/proxypool/log"
 	"github.com/One-Piecs/proxypool/pkg/geoIp"
+	"github.com/gammazero/workerpool"
 	"github.com/go-resty/resty/v2"
 	"github.com/jinzhu/copier"
 )
@@ -31,6 +32,17 @@ type Format struct {
 	Vless  bool
 }
 
+type ProxyScore struct {
+	Latency   int64
+	Stability float64
+	Score     float64
+}
+
+type BestNodeWithScore struct {
+	cache.BestNode
+	Score ProxyScore
+}
+
 func CrawlBestNode() {
 	urls := config.Config().SubIpUrl
 	if len(urls) == 0 {
@@ -38,196 +50,295 @@ func CrawlBestNode() {
 		return
 	}
 
-	addrAll := make([]string, 0, 200)
+	addrMap := sync.Map{}
+	bestNodeList := make([]BestNodeWithScore, 0, 200)
 
-	bestNodeList := make([]cache.BestNode, 0, 200)
-
-	chn := make(chan []string, len(urls))
+	// 使用workerpool进行并发处理
+	wp := workerpool.New(10) // 设置合适的并发数
 	wg := &sync.WaitGroup{}
+	var err error
 
 	for _, _url := range urls {
 		wg.Add(1)
-		go func(_url string) {
+		_url := _url // 创建副本避免闭包问题
+		wp.Submit(func() {
+			defer wg.Done()
 			log.Infoln("Starting: %s", _url)
-			list := make([]string, 0, 100)
 
-			resp, err := resty.New().R().
-				SetQueryParams(map[string]string{
-					"host":       "p.laibbb.top",
-					"uuid":       "e4e08238-e42c-4288-8f67-e2994ec18c90",
-					"pw":         "e4e08238",
-					"path":       "/webhook",
-					"edgetunnel": "cmliu",
-				}).
-				SetHeader("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36").
-				Get(_url)
-			if err != nil {
-				log.Errorln("resty.Get(): %s", err.Error())
-				chn <- list
-				wg.Done()
-				return
-			}
-			de64, err := base64.StdEncoding.DecodeString(resp.String())
-			if err != nil {
-				log.Errorln("url[%s] base64.StdEncoding.DecodeString(): %s", _url, err.Error())
-				chn <- list
-				wg.Done()
-				return
-			}
-			// fmt.Println(url, "\n", string(de64))
-			r := bufio.NewScanner(bytes.NewReader(de64))
-
-			for r.Scan() {
-				addr, err := ExtractHostPort(r.Text())
+			// 添加重试机制
+			for retries := 0; retries < 3; retries++ {
+				resp, err := resty.New().R().
+					SetQueryParams(map[string]string{
+						"host":       "p.laibbb.top",
+						"uuid":       "e4e08238-e42c-4288-8f67-e2994ec18c90",
+						"pw":         "e4e08238",
+						"path":       "/webhook",
+						"edgetunnel": "cmliu",
+					}).
+					SetHeader("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36").
+					Get(_url)
 				if err != nil {
-					log.Errorln("ExtractHostPort: %s", err.Error())
+					log.Errorln("resty.Get(): %s, retry: %d", err.Error(), retries)
+					time.Sleep(time.Second * time.Duration(retries+1))
 					continue
 				}
-				list = append(list, addr)
+
+				de64, err := base64.StdEncoding.DecodeString(resp.String())
+				if err != nil {
+					log.Errorln("url[%s] base64.StdEncoding.DecodeString(): %s, retry: %d", _url, err.Error(), retries)
+					time.Sleep(time.Second * time.Duration(retries+1))
+					continue
+				}
+
+				r := bufio.NewScanner(bytes.NewReader(de64))
+				for r.Scan() {
+					addr, err := ExtractHostPort(r.Text())
+					if err != nil {
+						log.Errorln("ExtractHostPort: %s", err.Error())
+						continue
+					}
+					// 使用sync.Map进行去重
+					addrMap.Store(addr, struct{}{})
+				}
+				break
 			}
-
-			chn <- list
-			wg.Done()
-			log.Infoln("End: %s, count: %d", _url, len(list))
-		}(_url)
-	}
-
-	wg.Wait()
-
-	num := 0
-	for addrs := range chn {
-		num++
-		addrAll = append(addrAll, addrs...)
-		if num == len(urls) {
-			close(chn)
-			break
-		}
-	}
-
-	log.Infoln("sub addrAll count: %d", len(addrAll))
-
-	addrAll = removeDuplicateElement(addrAll)
-
-	log.Infoln("sub addrAll removeDuplicateElement count: %d", len(addrAll))
-
-	var err error
-	for _, addr := range addrAll {
-		ip := ""
-		port := 0
-		h := strings.Split(addr, "]:")
-		if len(h) == 2 {
-			// ipv6
-			ip = strings.ReplaceAll(h[0], "[", "")
-			port, err = strconv.Atoi(h[1])
-			if err != nil {
-				log.Errorln("strconv.Atoi(h[1]): %s", err.Error())
-				continue
-			}
-		} else {
-			// ipv4
-			h := strings.Split(addr, ":")
-			if len(h) != 2 {
-				log.Errorln("invalid addr: %s", addr)
-				continue
-			}
-			ip = h[0]
-			port, err = strconv.Atoi(h[1])
-			if err != nil {
-				log.Errorln("strconv.Atoi(h[1]): %s", err.Error())
-				continue
-			}
-		}
-
-		if ip == "cf.090227.xyz" {
-			continue
-		}
-
-		_, country, err := geoIp.GeoIpDB.Find(ip)
-		if err != nil {
-			log.Errorln(err.Error())
-			continue
-		}
-
-		bestNodeList = append(bestNodeList, cache.BestNode{
-			Ip:      ip,
-			Port:    port,
-			Country: country,
+			log.Infoln("End: %s", _url)
 		})
 	}
 
-	// 排序
-	sort.Slice(bestNodeList, func(i, j int) bool {
-		return bestNodeList[i].Country+bestNodeList[i].Ip < bestNodeList[j].Country+bestNodeList[j].Ip
+	wg.Wait()
+	wp.Stop()
+
+	// 收集去重后的地址
+	addrAll := make([]string, 0, 200)
+	addrMap.Range(func(key, value interface{}) bool {
+		addrAll = append(addrAll, key.(string))
+		return true
 	})
 
-	// 保存到文件
+	log.Infoln("Total unique addresses: %d", len(addrAll))
 
-	cache.SetBestNodeList("bestNode", bestNodeList)
+	// 使用workerpool处理IP检测
+	wp = workerpool.New(20)
+	mux := sync.Mutex{}
+
+	for _, addr := range addrAll {
+		addr := addr // 创建副本
+		wp.Submit(func() {
+			ip := ""
+			port := 0
+			h := strings.Split(addr, "]:")
+			if len(h) == 2 {
+				// ipv6
+				ip = strings.ReplaceAll(h[0], "[", "")
+				port, err = strconv.Atoi(h[1])
+				if err != nil {
+					log.Errorln("strconv.Atoi(h[1]): %s", err.Error())
+					return
+				}
+			} else {
+				// ipv4
+				h := strings.Split(addr, ":")
+				if len(h) != 2 {
+					log.Errorln("invalid addr: %s", addr)
+					return
+				}
+				ip = h[0]
+				port, err = strconv.Atoi(h[1])
+				if err != nil {
+					log.Errorln("strconv.Atoi(h[1]): %s", err.Error())
+					return
+				}
+			}
+
+			if ip == "cf.090227.xyz" {
+				return
+			}
+
+			_, country, err := geoIp.GeoIpDB.Find(ip)
+			if err != nil {
+				log.Errorln("GeoIP lookup failed for %s: %s", ip, err.Error())
+				return
+			}
+
+			// 进行节点质量评分
+			// startTime := time.Now()
+			latency := int64(0)
+			stability := 0.0
+			success := 0
+
+			// 进行多次连接测试
+			for i := 0; i < 3; i++ {
+				start := time.Now()
+				client := resty.New().SetTimeout(5 * time.Second)
+				_, err := client.R().Get(fmt.Sprintf("http://%s:%d", ip, port))
+				if err == nil {
+					success++
+					latency += time.Since(start).Milliseconds()
+				}
+				time.Sleep(time.Second)
+			}
+
+			// 计算平均延迟和稳定性
+			if success > 0 {
+				latency = latency / int64(success)
+				stability = float64(success) / 3.0
+			}
+
+			// 计算综合评分
+			score := float64(1000-latency) * stability
+			if score < 0 {
+				score = 0
+			}
+
+			node := BestNodeWithScore{
+				BestNode: cache.BestNode{
+					Ip:      ip,
+					Port:    port,
+					Country: country,
+				},
+				Score: ProxyScore{
+					Latency:   latency,
+					Stability: stability,
+					Score:     score,
+				},
+			}
+
+			mux.Lock()
+			bestNodeList = append(bestNodeList, node)
+			mux.Unlock()
+
+			log.Infoln("Node %s:%d tested - Latency: %dms, Stability: %.2f, Score: %.2f",
+				ip, port, latency, stability, score)
+		})
+	}
+
+	wp.StopWait()
+
+	// 根据评分排序
+	sort.Slice(bestNodeList, func(i, j int) bool {
+		return bestNodeList[i].Score.Score > bestNodeList[j].Score.Score
+	})
+
+	// 转换为缓存格式并保存
+	finalList := make([]cache.BestNode, 0, len(bestNodeList))
+	for _, node := range bestNodeList {
+		finalList = append(finalList, node.BestNode)
+	}
+
+	cache.SetBestNodeList("bestNode", finalList)
 	cache.SetString("bestNodeLastUpdateTime", time.Now().Format(time.RFC3339))
+	log.Infoln("Completed processing %d nodes", len(bestNodeList))
 }
 
 func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode string) (s string, err error) {
+	// 使用defer来记录函数执行时间
+	start := time.Now()
+	defer func() {
+		log.Infoln("SubNiceProxyIp completed in %v", time.Since(start))
+	}()
+
+	// 检查格式并获取配置
 	f, err := checkFormat(format, distNodeCountry)
 	if err != nil {
-		return "", err
+		log.Errorln("Format check failed: %v", err)
+		return "", fmt.Errorf("format check error: %w", err)
 	}
 
+	// 获取并验证节点列表
 	bestNodeList := cache.GetBestNodeList("bestNode")
 	if len(bestNodeList) == 0 {
+		log.Errorln("No best nodes found")
 		return "", errors.New("not found best node list")
 	}
 
+	// 预分配buffer以提高性能
 	buf := strings.Builder{}
-	buf.WriteString("# " + cache.GetString("bestNodeLastUpdateTime") + "\n")
+	buf.Grow(len(bestNodeList) * 200) // 预估每个节点约200字节
 
+	// 写入头部信息
+	buf.WriteString("# " + cache.GetString("bestNodeLastUpdateTime") + "\n")
 	if f.Clash {
 		buf.WriteString("proxies:\n")
 	}
 
-	proxyCountryIsoCodeList := strings.Split(proxyCountryIsoCode, ",")
+	// 优化国家代码过滤
+	var countryFilter map[string]struct{}
+	if proxyCountryIsoCode != "" {
+		countryFilter = make(map[string]struct{})
+		for _, code := range strings.Split(proxyCountryIsoCode, ",") {
+			countryFilter[code] = struct{}{}
+		}
+	}
 
+	// 复制代理信息以避免并发问题
 	var proxyInfo config.ProxyInfo
+	if err := copier.Copy(&proxyInfo, &config.Config().ProxyInfo); err != nil {
+		log.Errorln("Failed to copy proxy info: %v", err)
+		return "", fmt.Errorf("proxy info copy error: %w", err)
+	}
 
-	_ = copier.Copy(&proxyInfo, &config.Config().ProxyInfo)
+	// 使用函数映射来简化URL生成逻辑
+	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, int){
+		"surge_vmess":  genSurgeVmessUrl,
+		"surge_trojan": genSurgeTrojanUrl,
+		"clash_vmess":  genClashVmessUrl,
+		"clash_trojan": genClashTrojanUrl,
+		"clash_vless":  genClashVlessUrl,
+		"quanx_vmess":  genQuanXVmessUrl,
+		"quanx_trojan": genQuanXTrojanUrl,
+		"quanx_vless":  genQuanXVlessUrl,
+		"loon_vmess":   genLoonVmessUrl,
+		"loon_trojan":  genLoonTrojanUrl,
+		"loon_vless":   genLoonVlessUrl,
+	}
 
+	// 处理每个节点
 	for _, node := range bestNodeList {
-
-		if !filterIpCountry(proxyCountryIsoCodeList, node.Country) {
-			continue
-		}
-
-		if f.Surge {
-			if f.Vmess {
-				genSurgeVmessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
-			} else if f.Trojan {
-				genSurgeTrojanUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
+		// 优化的国家过滤逻辑
+		if countryFilter != nil {
+			matched := false
+			for code := range countryFilter {
+				if strings.Contains(node.Country, code) {
+					matched = true
+					break
+				}
 			}
-		} else if f.Clash {
-			if f.Vmess {
-				genClashVmessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
-			} else if f.Trojan {
-				genClashTrojanUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
-			} else if f.Vless {
-				genClashVlessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
-			}
-		} else if f.QuanX {
-			if f.Vmess {
-				genQuanXVmessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
-			} else if f.Trojan {
-				genQuanXTrojanUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
-			} else if f.Vless {
-				genQuanXVlessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
-			}
-		} else if f.Loon {
-			if f.Vmess {
-				genLoonVmessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
-			} else if f.Trojan {
-				genLoonTrojanUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
-			} else if f.Vless {
-				genLoonVlessUrl(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
+			if !matched {
+				continue
 			}
 		}
 
+		// 根据格式类型选择URL生成器
+		var generator func(*strings.Builder, config.ProxyInfo, string, string, string, int)
+		switch {
+		case f.Surge && f.Vmess:
+			generator = urlGenerators["surge_vmess"]
+		case f.Surge && f.Trojan:
+			generator = urlGenerators["surge_trojan"]
+		case f.Clash && f.Vmess:
+			generator = urlGenerators["clash_vmess"]
+		case f.Clash && f.Trojan:
+			generator = urlGenerators["clash_trojan"]
+		case f.Clash && f.Vless:
+			generator = urlGenerators["clash_vless"]
+		case f.QuanX && f.Vmess:
+			generator = urlGenerators["quanx_vmess"]
+		case f.QuanX && f.Trojan:
+			generator = urlGenerators["quanx_trojan"]
+		case f.QuanX && f.Vless:
+			generator = urlGenerators["quanx_vless"]
+		case f.Loon && f.Vmess:
+			generator = urlGenerators["loon_vmess"]
+		case f.Loon && f.Trojan:
+			generator = urlGenerators["loon_trojan"]
+		case f.Loon && f.Vless:
+			generator = urlGenerators["loon_vless"]
+		}
+
+		if generator != nil {
+			generator(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
+		}
 	}
 
 	return buf.String(), nil
