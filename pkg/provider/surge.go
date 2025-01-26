@@ -3,9 +3,9 @@ package provider
 import (
 	"strings"
 
-	"github.com/One-Piecs/proxypool/pkg/tool"
-
 	"github.com/One-Piecs/proxypool/pkg/proxy"
+
+	"github.com/One-Piecs/proxypool/pkg/tool"
 )
 
 // Surge provides functions that make proxies support clash client

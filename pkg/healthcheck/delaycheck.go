@@ -218,7 +218,7 @@ func testDelay(p proxy.Proxy) (delay uint16, err error) {
 
 			// 记录错误并打印日志
 			lastErr = err
-			fmt.Printf("测试URL %s 失败: %v\n", testURL, err)
+			// fmt.Printf("测试URL %s 失败: %v\n", testURL, err)
 		}
 
 		// 如果有部分成功的测试，返回平均延迟
