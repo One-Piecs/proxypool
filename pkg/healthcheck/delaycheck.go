@@ -167,25 +167,28 @@ func testDelay(p proxy.Proxy) (delay uint16, err error) {
 	pmap := make(map[string]interface{})
 	err = json.Unmarshal([]byte(p.String()), &pmap)
 	if err != nil {
-		return
+		fmt.Printf("解析代理配置失败: %v\n", err)
+		return 0, fmt.Errorf("解析代理配置失败: %v", err)
 	}
 
 	pmap["port"] = int(pmap["port"].(float64))
 	if p.TypeName() == "vmess" {
 		pmap["alterId"] = int(pmap["alterId"].(float64))
 		if network, ok := pmap["network"]; ok && network.(string) == "h2" {
-			return 0, nil // todo 暂无方法测试h2的延迟，clash对于h2的connection会阻塞  tls.handshake ??
+			return 0, fmt.Errorf("不支持h2协议的延迟测试")
 		}
 	}
 
 	clashProxy, err := adapter.ParseProxy(pmap)
 	if err != nil {
-		fmt.Println(err.Error())
-		return 0, err
+		fmt.Printf("创建代理实例失败: %v\n", err)
+		return 0, fmt.Errorf("创建代理实例失败: %v", err)
 	}
 
 	expectedStatus, _ := utils.NewUnsignedRanges[uint16]("204")
 	var lastErr error
+	var successCount int
+	var totalDelay uint16
 
 	// 智能重试机制
 	for retry := 0; retry <= maxRetries; retry++ {
@@ -198,23 +201,36 @@ func testDelay(p proxy.Proxy) (delay uint16, err error) {
 		// 遍历所有测试URL
 		for _, testURL := range testURLs {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			delay, err = clashProxy.URLTest(ctx, testURL, expectedStatus)
+			currentDelay, err := clashProxy.URLTest(ctx, testURL, expectedStatus)
 			cancel()
 
-			// 如果成功获取延迟，直接返回
-			if err == nil && delay > 0 {
-				return delay, nil
+			// 如果成功获取延迟
+			if err == nil && currentDelay > 0 {
+				successCount++
+				totalDelay += currentDelay
+
+				// 如果已经有足够的成功测试，返回平均延迟
+				if successCount >= 2 {
+					return totalDelay / uint16(successCount), nil
+				}
+				continue
 			}
 
-			// 记录最后一次错误
+			// 记录错误并打印日志
 			lastErr = err
+			fmt.Printf("测试URL %s 失败: %v\n", testURL, err)
+		}
+
+		// 如果有部分成功的测试，返回平均延迟
+		if successCount > 0 {
+			return totalDelay / uint16(successCount), nil
 		}
 
 		// 如果是最后一次重试，返回错误
 		if retry == maxRetries {
-			return 0, lastErr
+			return 0, fmt.Errorf("所有重试均失败: %v", lastErr)
 		}
 	}
 
-	return 0, lastErr
+	return 0, fmt.Errorf("测试失败: %v", lastErr)
 }
