@@ -15,12 +15,20 @@ import (
 	"github.com/metacubex/mihomo/adapter"
 
 	"github.com/One-Piecs/proxypool/pkg/proxy"
-
-	"github.com/ivpusic/grpool"
 )
 
-const defaultURLTestTimeout = time.Second * 5
+var (
+	defaultURLTestTimeout = time.Second * 5
+	testURLs              = []string{
+		"http://bing.com/generate_204",
+		"http://www.gstatic.com/generate_204",
+		"http://maps.google.com/generate_204",
+		"http://www.google.com/generate_204",
+	}
+	maxRetries = 2
+)
 
+/*
 func CleanBadProxiesWithGrpool(proxies []proxy.Proxy) (cproxies []proxy.Proxy) {
 	// Note: Grpool实现对go并发管理的封装，主要是在数据量大时减少内存占用，不会提高效率。
 	pool := grpool.NewPool(500, 200)
@@ -84,6 +92,7 @@ func CleanBadProxiesWithGrpool(proxies []proxy.Proxy) (cproxies []proxy.Proxy) {
 		}
 	}
 }
+*/
 
 func CleanBadProxiesWithWorkpool(proxies []proxy.Proxy) (cproxies []proxy.Proxy) {
 	pool := workerpool.New(500)
@@ -174,21 +183,38 @@ func testDelay(p proxy.Proxy) (delay uint16, err error) {
 		fmt.Println(err.Error())
 		return 0, err
 	}
-	/*
-		sTime := time.Now()
-		// err = HTTPHeadViaProxy(clashProxy, "http://www.gstatic.com/generate_204")
-		err = HTTPHeadViaProxy(clashProxy, "http://maps.google.com/generate_204")
-		if err != nil {
-			return 0, err
-		}
-		fTime := time.Now()
-		delay = uint16(fTime.Sub(sTime) / time.Millisecond)
-		return delay, nil
-	*/
-	ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
-	defer cancel()
-	// return clashProxy.URLTest(ctx, "http://www.google.com/generate_204")
 
 	expectedStatus, _ := utils.NewUnsignedRanges[uint16]("204")
-	return clashProxy.URLTest(ctx, "http://bing.com/generate_204", expectedStatus)
+	var lastErr error
+
+	// 智能重试机制
+	for retry := 0; retry <= maxRetries; retry++ {
+		// 自适应超时：首次使用默认超时，之后递增50%
+		timeout := defaultURLTestTimeout
+		if retry > 0 {
+			timeout = time.Duration(float64(timeout) * 1.5)
+		}
+
+		// 遍历所有测试URL
+		for _, testURL := range testURLs {
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			delay, err = clashProxy.URLTest(ctx, testURL, expectedStatus)
+			cancel()
+
+			// 如果成功获取延迟，直接返回
+			if err == nil && delay > 0 {
+				return delay, nil
+			}
+
+			// 记录最后一次错误
+			lastErr = err
+		}
+
+		// 如果是最后一次重试，返回错误
+		if retry == maxRetries {
+			return 0, lastErr
+		}
+	}
+
+	return 0, lastErr
 }
