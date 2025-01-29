@@ -173,8 +173,15 @@ func CrawlBestNode() {
 		if bestNodeList[i].Country != bestNodeList[j].Country {
 			return bestNodeList[i].Country < bestNodeList[j].Country
 		}
-		// 国家相同时按IP排序
+		// 国家相同时按IP排序，使用TCP数值比较
 		if bestNodeList[i].Ip != bestNodeList[j].Ip {
+			// 如果是IPv4地址，使用数值比较
+			ip1Parts := strings.Split(bestNodeList[i].Ip, ".")
+			ip2Parts := strings.Split(bestNodeList[j].Ip, ".")
+			if len(ip1Parts) == 4 && len(ip2Parts) == 4 {
+				return ipToUint32(bestNodeList[i].Ip) < ipToUint32(bestNodeList[j].Ip)
+			}
+			// 对于IPv6或其他格式，保持字符串比较
 			return bestNodeList[i].Ip < bestNodeList[j].Ip
 		}
 		// IP相同时按端口排序
@@ -367,6 +374,22 @@ func removeDuplicateElement(languages []string) []string {
 			temp[item] = struct{}{}
 			result = append(result, item)
 		}
+	}
+	return result
+}
+
+func ipToUint32(ip string) uint32 {
+	parts := strings.Split(ip, ".")
+	if len(parts) != 4 {
+		return 0
+	}
+	var result uint32
+	for i := 0; i < 4; i++ {
+		val, err := strconv.Atoi(parts[i])
+		if err != nil {
+			return 0
+		}
+		result = result<<8 | uint32(val)
 	}
 	return result
 }
