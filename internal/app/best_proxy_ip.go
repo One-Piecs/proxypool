@@ -32,17 +32,6 @@ type Format struct {
 	Vless  bool
 }
 
-type ProxyScore struct {
-	Latency   int64
-	Stability float64
-	Score     float64
-}
-
-type BestNodeWithScore struct {
-	cache.BestNode
-	Score ProxyScore
-}
-
 func CrawlBestNode() {
 	urls := config.Config().SubIpUrl
 	if len(urls) == 0 {
@@ -51,7 +40,7 @@ func CrawlBestNode() {
 	}
 
 	addrMap := sync.Map{}
-	bestNodeList := make([]BestNodeWithScore, 0, 200)
+	bestNodeList := make([]cache.BestNode, 0, 200)
 
 	// 使用workerpool进行并发处理
 	wp := workerpool.New(10) // 设置合适的并发数
@@ -161,72 +150,29 @@ func CrawlBestNode() {
 				return
 			}
 
-			// 进行节点质量评分
-			// startTime := time.Now()
-			latency := int64(0)
-			stability := 0.0
-			success := 0
-
-			// 进行多次连接测试
-			for i := 0; i < 3; i++ {
-				start := time.Now()
-				client := resty.New().SetTimeout(5 * time.Second)
-				_, err := client.R().Get(fmt.Sprintf("http://%s:%d", ip, port))
-				if err == nil {
-					success++
-					latency += time.Since(start).Milliseconds()
-				}
-				time.Sleep(time.Second)
-			}
-
-			// 计算平均延迟和稳定性
-			if success > 0 {
-				latency = latency / int64(success)
-				stability = float64(success) / 3.0
-			}
-
-			// 计算综合评分
-			score := float64(1000-latency) * stability
-			if score < 0 {
-				score = 0
-			}
-
-			node := BestNodeWithScore{
-				BestNode: cache.BestNode{
-					Ip:      ip,
-					Port:    port,
-					Country: country,
-				},
-				Score: ProxyScore{
-					Latency:   latency,
-					Stability: stability,
-					Score:     score,
-				},
+			// 创建节点
+			node := cache.BestNode{
+				Ip:      ip,
+				Port:    port,
+				Country: country,
 			}
 
 			mux.Lock()
 			bestNodeList = append(bestNodeList, node)
 			mux.Unlock()
 
-			log.Infoln("Node %s:%d tested - Latency: %dms, Stability: %.2f, Score: %.2f",
-				ip, port, latency, stability, score)
+			log.Infoln("Node %s:%d added from %s", ip, port, country)
 		})
 	}
 
 	wp.StopWait()
 
-	// 根据评分排序
+	// 按照国家名称排序
 	sort.Slice(bestNodeList, func(i, j int) bool {
-		return bestNodeList[i].Score.Score > bestNodeList[j].Score.Score
+		return bestNodeList[i].Country < bestNodeList[j].Country
 	})
 
-	// 转换为缓存格式并保存
-	finalList := make([]cache.BestNode, 0, len(bestNodeList))
-	for _, node := range bestNodeList {
-		finalList = append(finalList, node.BestNode)
-	}
-
-	cache.SetBestNodeList("bestNode", finalList)
+	cache.SetBestNodeList("bestNode", bestNodeList)
 	cache.SetString("bestNodeLastUpdateTime", time.Now().Format(time.RFC3339))
 	log.Infoln("Completed processing %d nodes", len(bestNodeList))
 }
