@@ -167,9 +167,18 @@ func CrawlBestNode() {
 
 	wp.StopWait()
 
-	// 按照国家名称排序
-	sort.Slice(bestNodeList, func(i, j int) bool {
-		return bestNodeList[i].Country < bestNodeList[j].Country
+	// 按照国家名称、IP和端口多级排序
+	sort.SliceStable(bestNodeList, func(i, j int) bool {
+		// 首先按国家排序
+		if bestNodeList[i].Country != bestNodeList[j].Country {
+			return bestNodeList[i].Country < bestNodeList[j].Country
+		}
+		// 国家相同时按IP排序
+		if bestNodeList[i].Ip != bestNodeList[j].Ip {
+			return bestNodeList[i].Ip < bestNodeList[j].Ip
+		}
+		// IP相同时按端口排序
+		return bestNodeList[i].Port < bestNodeList[j].Port
 	})
 
 	cache.SetBestNodeList("bestNode", bestNodeList)
