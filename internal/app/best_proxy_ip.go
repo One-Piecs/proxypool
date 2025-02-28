@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net/url"
 	"sort"
 	"strconv"
@@ -193,7 +194,7 @@ func CrawlBestNode() {
 	log.Infoln("Completed processing %d nodes", len(bestNodeList))
 }
 
-func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode string) (s string, err error) {
+func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode string, limit int, random bool) (s string, err error) {
 	// 使用defer来记录函数执行时间
 	start := time.Now()
 	defer func() {
@@ -255,7 +256,8 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 		"loon_vless":   genLoonVlessUrl,
 	}
 
-	// 处理每个节点
+	// 按国家分组节点
+	countryNodes := make(map[string][]cache.BestNode)
 	for _, node := range bestNodeList {
 		// 优化的国家过滤逻辑
 		if countryFilter != nil {
@@ -270,36 +272,57 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 				continue
 			}
 		}
+		countryNodes[node.Country] = append(countryNodes[node.Country], node)
+	}
 
-		// 根据格式类型选择URL生成器
-		var generator func(*strings.Builder, config.ProxyInfo, string, string, string, int)
-		switch {
-		case f.Surge && f.Vmess:
-			generator = urlGenerators["surge_vmess"]
-		case f.Surge && f.Trojan:
-			generator = urlGenerators["surge_trojan"]
-		case f.Clash && f.Vmess:
-			generator = urlGenerators["clash_vmess"]
-		case f.Clash && f.Trojan:
-			generator = urlGenerators["clash_trojan"]
-		case f.Clash && f.Vless:
-			generator = urlGenerators["clash_vless"]
-		case f.QuanX && f.Vmess:
-			generator = urlGenerators["quanx_vmess"]
-		case f.QuanX && f.Trojan:
-			generator = urlGenerators["quanx_trojan"]
-		case f.QuanX && f.Vless:
-			generator = urlGenerators["quanx_vless"]
-		case f.Loon && f.Vmess:
-			generator = urlGenerators["loon_vmess"]
-		case f.Loon && f.Trojan:
-			generator = urlGenerators["loon_trojan"]
-		case f.Loon && f.Vless:
-			generator = urlGenerators["loon_vless"]
+	// 处理每个国家的节点，并应用limit限制
+	for _, nodes := range countryNodes {
+		// 如果random为true，随机打乱节点顺序
+		if random {
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			r.Shuffle(len(nodes), func(i, j int) {
+				nodes[i], nodes[j] = nodes[j], nodes[i]
+			})
 		}
 
-		if generator != nil {
-			generator(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
+		nodeLimit := len(nodes)
+		// 仅当limit大于0时才限制节点数量
+		if limit > 0 && limit < nodeLimit {
+			nodeLimit = limit
+		}
+
+		for i := 0; i < nodeLimit; i++ {
+			node := nodes[i]
+			// 根据格式类型选择URL生成器
+			var generator func(*strings.Builder, config.ProxyInfo, string, string, string, int)
+			switch {
+			case f.Surge && f.Vmess:
+				generator = urlGenerators["surge_vmess"]
+			case f.Surge && f.Trojan:
+				generator = urlGenerators["surge_trojan"]
+			case f.Clash && f.Vmess:
+				generator = urlGenerators["clash_vmess"]
+			case f.Clash && f.Trojan:
+				generator = urlGenerators["clash_trojan"]
+			case f.Clash && f.Vless:
+				generator = urlGenerators["clash_vless"]
+			case f.QuanX && f.Vmess:
+				generator = urlGenerators["quanx_vmess"]
+			case f.QuanX && f.Trojan:
+				generator = urlGenerators["quanx_trojan"]
+			case f.QuanX && f.Vless:
+				generator = urlGenerators["quanx_vless"]
+			case f.Loon && f.Vmess:
+				generator = urlGenerators["loon_vmess"]
+			case f.Loon && f.Trojan:
+				generator = urlGenerators["loon_trojan"]
+			case f.Loon && f.Vless:
+				generator = urlGenerators["loon_vless"]
+			}
+
+			if generator != nil {
+				generator(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
+			}
 		}
 	}
 

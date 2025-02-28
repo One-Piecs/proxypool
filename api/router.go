@@ -417,7 +417,22 @@ func setupRouter() {
 		if distNodeCountry == "" {
 			distNodeCountry = "JP"
 		}
-		text, err := app.SubNiceProxyIp(format, distNodeCountry, c.Query("c"))
+		// 获取并解析limit参数
+		limitStr := c.Query("limit")
+		limit := 0
+		if limitStr != "" {
+			limit, err = strconv.Atoi(limitStr)
+			if err != nil {
+				c.String(500, "invalid limit parameter")
+				return
+			}
+		}
+		// 获取并解析random参数
+		random := false
+		if c.Query("random") == "true" {
+			random = true
+		}
+		text, err := app.SubNiceProxyIp(format, distNodeCountry, c.Query("c"), limit, random)
 		if err != nil {
 			c.String(500, err.Error())
 			return
@@ -434,7 +449,12 @@ func setupRouter() {
 		}
 
 		format := c.Param("format")
-		text, err := app.SubNiceProxyIp(format, "KR", c.Query("c"))
+		// 获取并解析random参数
+		random := false
+		if c.Query("random") == "true" {
+			random = true
+		}
+		text, err := app.SubNiceProxyIp(format, "KR", c.Query("c"), 0, random)
 		if err != nil {
 			c.String(500, err.Error())
 			return
