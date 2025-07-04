@@ -8,7 +8,6 @@ toolchain go1.24.1
 
 require (
 	github.com/arl/statsviz v0.6.0
-	github.com/cloudflare/cloudflare-go v0.73.0
 	github.com/gammazero/workerpool v1.1.3
 	github.com/ghodss/yaml v1.0.0
 	github.com/gin-contrib/cache v1.3.1
@@ -77,11 +76,8 @@ require (
 	github.com/gomodule/redigo v1.9.2 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/pprof v0.0.0-20250317173921-a4b03ec1a45e // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
-	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-retryablehttp v0.7.4 // indirect
 	github.com/hashicorp/yamux v0.1.2 // indirect
 	github.com/insomniacslk/dhcp v0.0.0-20250109001534-8abf58130905 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
