@@ -24,7 +24,7 @@ func (s Surge) Provide() string {
 				resultBuilder.WriteString(p.ToSurge() + "\n")
 			} else {
 				resultBuilder.WriteString(p.ToSurge())
-				resultBuilder.WriteString(" underlying-proxy=")
+				resultBuilder.WriteString(", underlying-proxy=")
 				resultBuilder.WriteString(s.UnderlyingProxy)
 				resultBuilder.WriteString("\n")
 			}
