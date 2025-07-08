@@ -17,12 +17,13 @@ type Provider interface {
 }
 
 type Base struct {
-	Proxies    *proxy.ProxyList `yaml:"proxies"`
-	Types      string           `yaml:"type"`
-	Country    string           `yaml:"country"`
-	NotCountry string           `yaml:"not_country"`
-	Speed      string           `yaml:"speed"`
-	Filter     string           `yaml:"filter"`
+	Proxies         *proxy.ProxyList `yaml:"proxies"`
+	Types           string           `yaml:"type"`
+	Country         string           `yaml:"country"`
+	NotCountry      string           `yaml:"not_country"`
+	Speed           string           `yaml:"speed"`
+	Filter          string           `yaml:"filter"`
+	UnderlyingProxy string           `yaml:"underlyingProxy"`
 }
 
 // 根据子类的的Provide()传入的信息筛选节点，结果会改变传入的proxylist。

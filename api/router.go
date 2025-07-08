@@ -187,8 +187,9 @@ func setupRouter() {
 		proxyNotCountry := c.DefaultQuery("nc", "")
 		proxySpeed := c.DefaultQuery("speed", "")
 		proxyFilter := c.DefaultQuery("filter", "")
+		proxyUnderlyingProxy := c.DefaultQuery("underlyingproxy", "")
 		text := ""
-		if proxyTypes == "" && proxyCountry == "" && proxyNotCountry == "" && proxySpeed == "" && proxyFilter == "" {
+		if proxyTypes == "" && proxyCountry == "" && proxyNotCountry == "" && proxySpeed == "" && proxyFilter == "" && proxyUnderlyingProxy == "" {
 			text = appcache.GetString("surgeproxies") // A string. To show speed in this if condition, this must be updated after speedtest
 			if text == "" {
 				proxies := appcache.GetProxies("proxies")
@@ -204,12 +205,13 @@ func setupRouter() {
 			proxies := appcache.GetProxies("allproxies")
 			surge := provider.Surge{
 				Base: provider.Base{
-					Proxies:    &proxies,
-					Types:      proxyTypes,
-					Country:    proxyCountry,
-					NotCountry: proxyNotCountry,
-					Speed:      proxySpeed,
-					Filter:     proxyFilter,
+					Proxies:         &proxies,
+					Types:           proxyTypes,
+					Country:         proxyCountry,
+					NotCountry:      proxyNotCountry,
+					Speed:           proxySpeed,
+					Filter:          proxyFilter,
+					UnderlyingProxy: proxyUnderlyingProxy,
 				},
 			}
 			text = surge.Provide()
@@ -217,12 +219,13 @@ func setupRouter() {
 			proxies := appcache.GetProxies("proxies")
 			surge := provider.Surge{
 				Base: provider.Base{
-					Proxies:    &proxies,
-					Types:      proxyTypes,
-					Country:    proxyCountry,
-					NotCountry: proxyNotCountry,
-					Speed:      proxySpeed,
-					Filter:     proxyFilter,
+					Proxies:         &proxies,
+					Types:           proxyTypes,
+					Country:         proxyCountry,
+					NotCountry:      proxyNotCountry,
+					Speed:           proxySpeed,
+					Filter:          proxyFilter,
+					UnderlyingProxy: proxyUnderlyingProxy,
 				},
 			}
 			text = surge.Provide()
