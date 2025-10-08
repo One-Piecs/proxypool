@@ -87,26 +87,33 @@ jobs:
             ${{ env.IMAGE_NAME }}:${{ github.ref_name }}-arm64
 
       - name: Verify multi-arch manifest
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          VERSION: ${{ github.ref_name }}
         run: |
-          echo "Verifying multi-arch manifest for version tag:"
-          docker buildx imagetools inspect ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
-          
-          echo "Verifying multi-arch manifest for latest tag:"
-          docker buildx imagetools inspect ${{ env.IMAGE_NAME }}:latest
+          # 使用 curl 和正确的认证
+          auth_response=$(curl -s -H "Content-Type: application/json" \
+            -X POST \
+            -d '{"username": "'"$DOCKERHUB_USERNAME"'", "password": "'"$DOCKERHUB_TOKEN"'"}' \
+            https://hub.docker.com/v2/users/login/)
 
-      - name: Clean up temporary architecture tags
-        run: |
-          # 删除临时的架构特定标签
-          echo "Cleaning up temporary architecture tags..."
-          
-          # 删除 AMD64 临时标签
-          docker run --rm alpine/curl:latest \
-            -u "${{ secrets.DOCKERHUB_USERNAME }}:${{ secrets.DOCKERHUB_TOKEN }}" \
-            -X DELETE "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/proxypool/tags/${{ github.ref_name }}-amd64/" || echo "Failed to delete amd64 tag, might not exist"
-          
-          # 删除 ARM64 临时标签
-          docker run --rm alpine/curl:latest \
-            -u "${{ secrets.DOCKERHUB_USERNAME }}:${{ secrets.DOCKERHUB_TOKEN }}" \
-            -X DELETE "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/proxypool/tags/${{ github.ref_name }}-arm64/" || echo "Failed to delete arm64 tag, might not exist"
-          
-          echo "Cleanup completed"
+          token=$(echo "$auth_response" | jq -r '.token')
+
+          if [ "$token" != "null" ]; then
+            echo "Deleting temporary tags..."
+
+            # 删除 amd64 标签
+            curl -s -H "Authorization: JWT $token" \
+              -X DELETE \
+              "https://hub.docker.com/v2/repositories/$DOCKERHUB_USERNAME/proxypool/tags/$VERSION-amd64/" && \
+            echo "Deleted $VERSION-amd64"
+
+            # 删除 arm64 标签
+            curl -s -H "Authorization: JWT $token" \
+              -X DELETE \
+              "https://hub.docker.com/v2/repositories/$DOCKERHUB_USERNAME/proxypool/tags/$VERSION-arm64/" && \
+            echo "Deleted $VERSION-arm64"
+          else
+            echo "Failed to authenticate with Docker Hub"
+          fi
