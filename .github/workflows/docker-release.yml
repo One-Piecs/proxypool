@@ -134,7 +134,7 @@ jobs:
             response=$(curl -s -o /dev/null -w "%{http_code}" \
               -H "Authorization: JWT $JWT_TOKEN" \
               -X DELETE \
-              "https://hub.docker.com/v2/repositories/$DOCKERHUB_USERNAME/proxy-pool/tags/$tag/")
+              "https://hub.docker.com/v2/repositories/$DOCKERHUB_USERNAME/proxypool/tags/$tag/")
 
             if [ "$response" = "204" ]; then
               echo "✓ Successfully deleted tag: $tag"
