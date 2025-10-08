@@ -6,6 +6,10 @@ FROM golang:${GO_VERSION}-alpine AS builder
 RUN apk add --no-cache make git \
     && rm -rf /var/cache/apk/*
 
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go mod download
+
 WORKDIR /proxypool-src
 COPY . .
 # 使用国内镜像加速依赖下载
