@@ -1,5 +1,5 @@
 # 构建阶段
-ARG GO_VERSION=1.23.5
+ARG GO_VERSION=1.25.2
 FROM golang:${GO_VERSION}-alpine AS builder
 
 # 安装构建依赖并清理缓存
