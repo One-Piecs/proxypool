@@ -1,8 +1,12 @@
-name: Build Multi-arch Docker Manifest
+name: Build Multi-arch Docker Image
 
 on:
   release:
     types: [published]
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/proxypool
 
 jobs:
   build:
@@ -17,10 +21,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        id: buildx
-        with:
-          driver-opts: |
-            image=moby/buildkit:buildx-stable-1
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -32,7 +32,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/proxypool
+          images: ${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=tag
             type=raw,value=latest
@@ -48,11 +48,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # 创建多架构镜像清单
-          provenance: false
-          attestations: |
-            mode=max,inline-only=true
 
       - name: Verify multi-arch manifest
         run: |
-          docker buildx imagetools inspect ${{ secrets.DOCKERHUB_USERNAME }}/your-image-name:${{ github.ref_name }}
+          docker buildx imagetools inspect ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
