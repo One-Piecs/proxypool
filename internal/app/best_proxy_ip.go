@@ -3,6 +3,7 @@ package app
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -57,7 +58,7 @@ func CrawlBestNode() {
 
 			// 添加重试机制
 			for retries := 0; retries < 3; retries++ {
-				resp, err := resty.New().R().
+				resp, err := resty.New().SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true}).R().
 					SetQueryParams(map[string]string{
 						"host":       "p.laibbb.top",
 						"uuid":       "e4e08238-e42c-4288-8f67-e2994ec18c90",
