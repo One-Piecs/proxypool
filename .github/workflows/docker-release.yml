@@ -94,10 +94,6 @@ jobs:
           echo "Verifying multi-arch manifest for latest tag:"
           docker buildx imagetools inspect ${{ env.IMAGE_NAME }}:latest
 
-  cleanup-tags:
-    runs-on: ubuntu-latest
-    needs: create-manifest
-    steps:
       - name: Install necessary tools
         run: |
           sudo apt-get update
