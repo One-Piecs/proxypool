@@ -1,8 +1,11 @@
 name: Build Multi-arch Docker Image
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*.*.*' # 匹配所有以 'v' 开头，后跟三个数字（或更多）的版本标签，例如 v1.0.0, v1.2.3-beta
+      - 'v*.*'   # 匹配 v1.0, v2.1 等
+      - '*'      # 如果你想匹配所有标签，包括非版本标签，但通常不推荐
 
 env:
   IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/proxypool
@@ -30,6 +33,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64
           push: true
+          # 对于标签，我们使用 github.ref_name，它会是你的 Git tag 名称（例如 v1.0.0）
           tags: ${{ env.IMAGE_NAME }}:${{ github.ref_name }}-amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -56,6 +60,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/arm64
           push: true
+          # 对于标签，我们使用 github.ref_name，它会是你的 Git tag 名称（例如 v1.0.0）
           tags: ${{ env.IMAGE_NAME }}:${{ github.ref_name }}-arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -76,11 +81,16 @@ jobs:
       - name: Create multi-arch manifest using buildx
         run: |
           # 使用 buildx imagetools 创建多架构清单
+          # github.ref_name 在 tag 触发时会是 tag 的名称 (例如 v1.0.0)
           docker buildx imagetools create \
             -t ${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
             ${{ env.IMAGE_NAME }}:${{ github.ref_name }}-amd64 \
             ${{ env.IMAGE_NAME }}:${{ github.ref_name }}-arm64
           
+          # 仅当标签是最新版本时才创建 latest 标签
+          # 这部分逻辑需要你自己判断，例如通过比较 github.ref_name 和当前最新版本
+          # 或者，你可以选择每次都更新 latest，这取决于你的发布策略。
+          # 如果每次都更新 latest，那么下面的代码是可行的。
           docker buildx imagetools create \
             -t ${{ env.IMAGE_NAME }}:latest \
             ${{ env.IMAGE_NAME }}:${{ github.ref_name }}-amd64 \
@@ -103,7 +113,7 @@ jobs:
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ github.ref_name }} # 在 tag 触发时，github.ref_name 就是 tag 的名称
         run: |
           # 获取 JWT token
           echo "Getting Docker Hub JWT token..."
