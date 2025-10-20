@@ -74,3 +74,6 @@ proxy_info:
       host: "2.top"
       password: "password"
       path: "/websocket"
+
+cf_best_ip:
+  - "mfa.gov.ua"

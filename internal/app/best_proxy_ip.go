@@ -330,6 +330,96 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 	return buf.String(), nil
 }
 
+func SubNiceCfProxyIp(format string, distNodeCountry string) (s string, err error) {
+	// 使用defer来记录函数执行时间
+	start := time.Now()
+	defer func() {
+		log.Infoln("SubNiceCfProxyIp completed in %v", time.Since(start))
+	}()
+
+	// 检查格式并获取配置
+	f, err := checkFormat(format, distNodeCountry)
+	if err != nil {
+		log.Errorln("Format check failed: %v", err)
+		return "", fmt.Errorf("format check error: %w", err)
+	}
+
+	// 获取 cf_best_ip list
+	bestCfNodeList := config.Config().CfBestIp
+	if len(bestCfNodeList) == 0 {
+		log.Errorln("No best cf nodes found")
+		return "", errors.New("not found best cf node list")
+	}
+
+	// 预分配buffer以提高性能
+	buf := strings.Builder{}
+	buf.Grow(len(bestCfNodeList) * 30) // 预估每个节点约30字节
+
+	// 写入头部信息
+	buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
+	if f.Clash {
+		buf.WriteString("proxies:\n")
+	}
+
+	// 复制代理信息以避免并发问题
+	var proxyInfo config.ProxyInfo
+	if err := copier.Copy(&proxyInfo, &config.Config().ProxyInfo); err != nil {
+		log.Errorln("Failed to copy proxy info: %v", err)
+		return "", fmt.Errorf("proxy info copy error: %w", err)
+	}
+
+	// 使用函数映射来简化URL生成逻辑
+	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, int){
+		"surge_vmess":  genSurgeVmessUrl,
+		"surge_trojan": genSurgeTrojanUrl,
+		"clash_vmess":  genClashVmessUrl,
+		"clash_trojan": genClashTrojanUrl,
+		"clash_vless":  genClashVlessUrl,
+		"quanx_vmess":  genQuanXVmessUrl,
+		"quanx_trojan": genQuanXTrojanUrl,
+		"quanx_vless":  genQuanXVlessUrl,
+		"loon_vmess":   genLoonVmessUrl,
+		"loon_trojan":  genLoonTrojanUrl,
+		"loon_vless":   genLoonVlessUrl,
+	}
+
+	// 处理每个国家的节点，并应用limit限制
+	for _, node := range bestCfNodeList {
+		// 根据格式类型选择URL生成器
+		var generator func(*strings.Builder, config.ProxyInfo, string, string, string, int)
+		switch {
+		case f.Surge && f.Vmess:
+			generator = urlGenerators["surge_vmess"]
+		case f.Surge && f.Trojan:
+			generator = urlGenerators["surge_trojan"]
+		case f.Clash && f.Vmess:
+			generator = urlGenerators["clash_vmess"]
+		case f.Clash && f.Trojan:
+			generator = urlGenerators["clash_trojan"]
+		case f.Clash && f.Vless:
+			generator = urlGenerators["clash_vless"]
+		case f.QuanX && f.Vmess:
+			generator = urlGenerators["quanx_vmess"]
+		case f.QuanX && f.Trojan:
+			generator = urlGenerators["quanx_trojan"]
+		case f.QuanX && f.Vless:
+			generator = urlGenerators["quanx_vless"]
+		case f.Loon && f.Vmess:
+			generator = urlGenerators["loon_vmess"]
+		case f.Loon && f.Trojan:
+			generator = urlGenerators["loon_trojan"]
+		case f.Loon && f.Vless:
+			generator = urlGenerators["loon_vless"]
+		}
+
+		if generator != nil {
+			generator(&buf, proxyInfo, distNodeCountry, distNodeCountry, node, 443)
+		}
+	}
+
+	return buf.String(), nil
+}
+
 func filterIpCountry(filter []string, c string) bool {
 	if len(filter) == 0 || filter[0] == "" {
 		return true
