@@ -412,8 +412,10 @@ func SubNiceCfProxyIp(format string, distNodeCountry string) (s string, err erro
 			generator = urlGenerators["loon_vless"]
 		}
 
+		country := geoIp.GeoIpDB.FindCountryIsoEmoji(distNodeCountry)
+
 		if generator != nil {
-			generator(&buf, proxyInfo, distNodeCountry, distNodeCountry, node, 443)
+			generator(&buf, proxyInfo, distNodeCountry, country, node, 443)
 		}
 	}
 

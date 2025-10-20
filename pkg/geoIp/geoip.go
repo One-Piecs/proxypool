@@ -239,3 +239,7 @@ func (g GeoIP) Find(ipORdomain string) (ip, country string, err error) {
 	}
 	return
 }
+
+func (g GeoIP) FindCountryIsoEmoji(countryIsoCode string) string {
+	return g.emojiMap[countryIsoCode]
+}
