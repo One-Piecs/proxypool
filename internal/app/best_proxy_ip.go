@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/url"
 	"sort"
@@ -19,6 +21,7 @@ import (
 	"github.com/One-Piecs/proxypool/internal/cache"
 	"github.com/One-Piecs/proxypool/log"
 	"github.com/One-Piecs/proxypool/pkg/geoIp"
+	"github.com/One-Piecs/proxypool/pkg/tool"
 	"github.com/gammazero/workerpool"
 	"github.com/go-resty/resty/v2"
 	"github.com/jinzhu/copier"
@@ -349,6 +352,152 @@ func SubNiceCfProxyIp(format string, distNodeCountry string) (s string, err erro
 	if len(bestCfNodeList) == 0 {
 		log.Errorln("No best cf nodes found")
 		return "", errors.New("not found best cf node list")
+	}
+
+	// 预分配buffer以提高性能
+	buf := strings.Builder{}
+	buf.Grow(len(bestCfNodeList) * 30) // 预估每个节点约30字节
+
+	// 写入头部信息
+	buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
+	if f.Clash {
+		buf.WriteString("proxies:\n")
+	}
+
+	// 复制代理信息以避免并发问题
+	var proxyInfo config.ProxyInfo
+	if err := copier.Copy(&proxyInfo, &config.Config().ProxyInfo); err != nil {
+		log.Errorln("Failed to copy proxy info: %v", err)
+		return "", fmt.Errorf("proxy info copy error: %w", err)
+	}
+
+	// 使用函数映射来简化URL生成逻辑
+	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, int){
+		"surge_vmess":  genSurgeVmessUrl,
+		"surge_trojan": genSurgeTrojanUrl,
+		"clash_vmess":  genClashVmessUrl,
+		"clash_trojan": genClashTrojanUrl,
+		"clash_vless":  genClashVlessUrl,
+		"quanx_vmess":  genQuanXVmessUrl,
+		"quanx_trojan": genQuanXTrojanUrl,
+		"quanx_vless":  genQuanXVlessUrl,
+		"loon_vmess":   genLoonVmessUrl,
+		"loon_trojan":  genLoonTrojanUrl,
+		"loon_vless":   genLoonVlessUrl,
+	}
+
+	// 处理每个国家的节点，并应用limit限制
+	for _, node := range bestCfNodeList {
+		// 根据格式类型选择URL生成器
+		var generator func(*strings.Builder, config.ProxyInfo, string, string, string, int)
+		switch {
+		case f.Surge && f.Vmess:
+			generator = urlGenerators["surge_vmess"]
+		case f.Surge && f.Trojan:
+			generator = urlGenerators["surge_trojan"]
+		case f.Clash && f.Vmess:
+			generator = urlGenerators["clash_vmess"]
+		case f.Clash && f.Trojan:
+			generator = urlGenerators["clash_trojan"]
+		case f.Clash && f.Vless:
+			generator = urlGenerators["clash_vless"]
+		case f.QuanX && f.Vmess:
+			generator = urlGenerators["quanx_vmess"]
+		case f.QuanX && f.Trojan:
+			generator = urlGenerators["quanx_trojan"]
+		case f.QuanX && f.Vless:
+			generator = urlGenerators["quanx_vless"]
+		case f.Loon && f.Vmess:
+			generator = urlGenerators["loon_vmess"]
+		case f.Loon && f.Trojan:
+			generator = urlGenerators["loon_trojan"]
+		case f.Loon && f.Vless:
+			generator = urlGenerators["loon_vless"]
+		}
+
+		country := geoIp.GeoIpDB.FindCountryIsoEmoji(distNodeCountry)
+
+		if generator != nil {
+			generator(&buf, proxyInfo, distNodeCountry, country, node, 443)
+		}
+	}
+
+	return buf.String(), nil
+}
+
+// vps789 openapi
+type CfIpTop20 struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Count   int    `json:"count"`
+	Data    struct {
+		Good []struct {
+			Id              int     `json:"id"`
+			VpsId           int     `json:"vpsId"`
+			Ip              string  `json:"ip"`
+			AvgLatency      int     `json:"avgLatency"`
+			AvgPkgLostRate  float64 `json:"avgPkgLostRate"`
+			YdLatency       int     `json:"ydLatency"`
+			YdPkgLostRate   int     `json:"ydPkgLostRate"`
+			LtLatency       int     `json:"ltLatency"`
+			LtPkgLostRate   int     `json:"ltPkgLostRate"`
+			DxLatency       int     `json:"dxLatency"`
+			DxPkgLostRate   int     `json:"dxPkgLostRate"`
+			Label           string  `json:"label"`
+			CreatedTime     string  `json:"createdTime"`
+			AvgScore        int     `json:"avgScore"`
+			YdScore         int     `json:"ydScore"`
+			DxScore         int     `json:"dxScore"`
+			LtScore         int     `json:"ltScore"`
+			HostProvider    string  `json:"hostProvider,omitempty"`
+			LocationCountry string  `json:"locationCountry,omitempty"`
+			LocationCity    string  `json:"locationCity,omitempty"`
+		} `json:"good"`
+	} `json:"data"`
+}
+
+// SubNiceCfProxyIpTop20 获取 https://vps789.com/openApi/cfIpTop20
+func SubNiceCfProxyIpTop20(format string, distNodeCountry string) (s string, err error) {
+	// 使用defer来记录函数执行时间
+	start := time.Now()
+	defer func() {
+		log.Infoln("SubNiceCfProxyIp completed in %v", time.Since(start))
+	}()
+
+	// 检查格式并获取配置
+	f, err := checkFormat(format, distNodeCountry)
+	if err != nil {
+		log.Errorln("Format check failed: %v", err)
+		return "", fmt.Errorf("format check error: %w", err)
+	}
+
+	// 获取 cf_top_ip list
+	// bestCfNodeList := config.Config().CfBestIp
+	// if len(bestCfNodeList) == 0 {
+	// 	log.Errorln("No best cf nodes found")
+	// 	return "", errors.New("not found best cf node list")
+	// }
+
+	resp, err := tool.GetHttpClient().Get("https://vps789.com/openApi/cfIpTop20")
+	if err != nil {
+		log.Errorln("get cfIpTop20 failed: %v", err)
+		return "", fmt.Errorf("get cfIpTop20 failed: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Errorln("get cfIpTop20 readall: %v", err)
+		return "", fmt.Errorf("get cfIpTop20 readall: %w", err)
+	}
+	var top20 CfIpTop20
+	err = json.Unmarshal(body, &top20)
+	if err != nil {
+		log.Errorln("cfIpTop20 body json format: %v", err)
+		return "", fmt.Errorf("cfIpTop20 body json format: %w", err)
+	}
+	bestCfNodeList := make([]string, 0, 20)
+	for _, good := range top20.Data.Good {
+		bestCfNodeList = append(bestCfNodeList, good.Ip)
 	}
 
 	// 预分配buffer以提高性能

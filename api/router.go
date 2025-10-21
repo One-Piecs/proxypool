@@ -465,6 +465,28 @@ func setupRouter() {
 		c.String(200, text)
 	})
 
+	router.GET("/bestCfProxyIpTop20/:format", func(c *gin.Context) {
+		err := config.Parse("")
+		if err != nil {
+			log.Errorln("config parse error: %s", err)
+			c.String(500, err.Error())
+			return
+		}
+
+		format := c.Param("format")
+		distNodeCountry := c.Query("d")
+		if distNodeCountry == "" {
+			distNodeCountry = "JP"
+		}
+
+		text, err := app.SubNiceCfProxyIpTop20(format, distNodeCountry)
+		if err != nil {
+			c.String(500, err.Error())
+			return
+		}
+		c.String(200, text)
+	})
+
 	router.GET("/bestIpKr/:format", func(c *gin.Context) {
 		err := config.Parse("")
 		if err != nil {
