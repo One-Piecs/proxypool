@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"net/url"
 	"sort"
 	"strconv"
@@ -457,7 +458,7 @@ type CfIpTop20 struct {
 }
 
 // SubNiceCfProxyIpTop20 获取 https://vps789.com/openApi/cfIpTop20
-func SubNiceCfProxyIpTop20(format string, distNodeCountry string) (s string, err error) {
+func SubNiceCfProxyIpTop20(format string, distNodeCountry string, isConvertIp bool) (s string, err error) {
 	// 使用defer来记录函数执行时间
 	start := time.Now()
 	defer func() {
@@ -497,7 +498,17 @@ func SubNiceCfProxyIpTop20(format string, distNodeCountry string) (s string, err
 	}
 	bestCfNodeList := make([]string, 0, 20)
 	for _, good := range top20.Data.Good {
-		bestCfNodeList = append(bestCfNodeList, good.Ip)
+		if isConvertIp {
+			ips, err := net.LookupIP(good.Ip)
+			if err != nil {
+				return "", fmt.Errorf("DNS查询失败: %w", err)
+			}
+			for _, ip := range ips {
+				bestCfNodeList = append(bestCfNodeList, ip.String())
+			}
+		} else {
+			bestCfNodeList = append(bestCfNodeList, good.Ip)
+		}
 	}
 
 	// 预分配buffer以提高性能
