@@ -790,6 +790,7 @@ func SubNiceCfProxyIpProvider(format string, isp string, distNodeCountry string)
 type nodeBase struct {
 	hostname string
 	port     string
+	fragment string
 }
 
 // SubNiceCfProxySub 从 cf sub 订阅连接替换为自己的 IP
@@ -835,7 +836,7 @@ func SubNiceCfProxySub(format string, sub string, distNodeCountry string) (s str
 			continue
 		}
 		// 使用sync.Map进行去重
-		addrMap.Store(nodeBase{parsedURL.Hostname(), parsedURL.Port()}, struct{}{})
+		addrMap.Store(nodeBase{parsedURL.Hostname(), parsedURL.Port(), parsedURL.Fragment}, struct{}{})
 	}
 
 	bestCfNodeList := make([]nodeBase, 0, 200)
@@ -862,24 +863,24 @@ func SubNiceCfProxySub(format string, sub string, distNodeCountry string) (s str
 	}
 
 	// 使用函数映射来简化URL生成逻辑
-	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, int){
-		"surge_vmess":  genSurgeVmessUrl,
-		"surge_trojan": genSurgeTrojanUrl,
-		"clash_vmess":  genClashVmessUrl,
-		"clash_trojan": genClashTrojanUrl,
-		"clash_vless":  genClashVlessUrl,
-		"quanx_vmess":  genQuanXVmessUrl,
-		"quanx_trojan": genQuanXTrojanUrl,
-		"quanx_vless":  genQuanXVlessUrl,
-		"loon_vmess":   genLoonVmessUrl,
-		"loon_trojan":  genLoonTrojanUrl,
-		"loon_vless":   genLoonVlessUrl,
+	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, string, int){
+		"surge_vmess":  genSurgeVmessUrl2,
+		"surge_trojan": genSurgeTrojanUrl2,
+		"clash_vmess":  genClashVmessUrl2,
+		"clash_trojan": genClashTrojanUrl2,
+		"clash_vless":  genClashVlessUrl2,
+		"quanx_vmess":  genQuanXVmessUrl2,
+		"quanx_trojan": genQuanXTrojanUrl2,
+		"quanx_vless":  genQuanXVlessUrl2,
+		"loon_vmess":   genLoonVmessUrl2,
+		"loon_trojan":  genLoonTrojanUrl2,
+		"loon_vless":   genLoonVlessUrl2,
 	}
 
 	// 处理每个国家的节点，并应用limit限制
 	for _, node := range bestCfNodeList {
 		// 根据格式类型选择URL生成器
-		var generator func(*strings.Builder, config.ProxyInfo, string, string, string, int)
+		var generator func(*strings.Builder, config.ProxyInfo, string, string, string, string, int)
 		switch {
 		case f.Surge && f.Vmess:
 			generator = urlGenerators["surge_vmess"]
@@ -917,7 +918,7 @@ func SubNiceCfProxySub(format string, sub string, distNodeCountry string) (s str
 		}
 
 		if generator != nil {
-			generator(&buf, proxyInfo, distNodeCountry, country, node.hostname, port)
+			generator(&buf, proxyInfo, distNodeCountry, country, node.fragment, node.hostname, port)
 		}
 	}
 
@@ -1123,6 +1124,125 @@ func genLoonTrojanUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCoun
 	buf.WriteString(fmt.Sprintf(`%s %s:%d = trojan, %s, %d, "%s", transport=ws, sni=%s, path=%s, host=%s, udp=true
 `,
 		country, ip, port,
+		ip, port,
+		proxyInfo[nodeCountry]["trojan"]["password"],
+		proxyInfo[nodeCountry]["trojan"]["host"],
+		proxyInfo[nodeCountry]["trojan"]["path"],
+		proxyInfo[nodeCountry]["trojan"]["host"],
+	))
+}
+
+func genSurgeVmessUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`%s %s = vmess, %-15s, %d, username=%v, sni=%v, ws=true, ws-path=%v, ws-headers=Host:"%v", vmess-aead=true, tls=true
+`,
+		country, nodeName, ip, port,
+		proxyInfo[nodeCountry]["vmess"]["uuid"],
+		proxyInfo[nodeCountry]["vmess"]["host"],
+		proxyInfo[nodeCountry]["vmess"]["path"],
+		proxyInfo[nodeCountry]["vmess"]["host"]))
+}
+
+func genSurgeTrojanUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`%s %s = trojan, %-15s, %d, password=%v, sni=%v, ws=true, ws-path=%v, ws-headers=Host:"%v"
+`,
+		country, nodeName, ip, port,
+		proxyInfo[nodeCountry]["trojan"]["password"],
+		proxyInfo[nodeCountry]["trojan"]["host"],
+		proxyInfo[nodeCountry]["trojan"]["path"],
+		proxyInfo[nodeCountry]["trojan"]["host"]))
+}
+
+func genClashVlessUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %s", "type":"vless", "server":"%s", "port":%d, "uuid":"%v", "network":"ws", "tls":true, "udp":true, "sni":"%v", "client-fingerprint":"chrome", "ws-opts":{"path":"%v", "headers":{"Host":"%v"}}}
+`,
+		country, nodeName, ip, port,
+		proxyInfo[nodeCountry]["vless"]["uuid"],
+		proxyInfo[nodeCountry]["vless"]["host"],
+		proxyInfo[nodeCountry]["vless"]["path"],
+		proxyInfo[nodeCountry]["vless"]["host"]))
+}
+
+func genClashVmessUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %s", "type":"vmess", "server":"%s", "port":%d, "uuid":"%v", "tls":true, "cipher":"none", "alterId":0, "network":"ws", "ws-opts":{"path":"%v", "headers":{"Host":"%v"}}, "servername":"%v"}
+`,
+		country, nodeName, ip, port,
+		proxyInfo[nodeCountry]["vmess"]["uuid"],
+		proxyInfo[nodeCountry]["vmess"]["path"],
+		proxyInfo[nodeCountry]["vmess"]["host"],
+		proxyInfo[nodeCountry]["vmess"]["host"]))
+}
+
+func genClashTrojanUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, node_country, country, nodeName string, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %s", "type":"trojan", "server":"%s", "port":%d, "password":"%v", "sni":"%v", "network":"ws", "ws-opts":{"path":"%v", "headers":{"Host":"%v"}}}
+`,
+		country, nodeName, ip, port,
+		proxyInfo[node_country]["trojan"]["password"],
+		proxyInfo[node_country]["trojan"]["host"],
+		proxyInfo[node_country]["trojan"]["path"],
+		proxyInfo[node_country]["trojan"]["host"]))
+}
+
+func genQuanXVlessUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`vless = %s:%d, method=none, password=%s, obfs=wss, obfs-uri=%s, obfs-host=%s, tls-verification=false, tls-host=%s, fast-open=false, udp-relay=true, tag=%s %s
+`,
+		ip, port,
+		proxyInfo[nodeCountry]["vless"]["uuid"],
+		proxyInfo[nodeCountry]["vless"]["path"],
+		proxyInfo[nodeCountry]["vless"]["host"],
+		proxyInfo[nodeCountry]["vless"]["host"],
+		country, nodeName))
+}
+
+func genQuanXVmessUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`vmess = %s:%d, method=none, password=%s, obfs=wss, obfs-uri=%s, obfs-host=%s, tls-host=%s, aead=true, udp-relay=true, tag=%s %s
+`,
+		ip, port,
+		proxyInfo[nodeCountry]["vmess"]["uuid"],
+		proxyInfo[nodeCountry]["vmess"]["path"],
+		proxyInfo[nodeCountry]["vmess"]["host"],
+		proxyInfo[nodeCountry]["vmess"]["host"],
+		country, nodeName))
+}
+
+func genQuanXTrojanUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`trojan = %s:%d, password=%s, obfs=wss, obfs-uri=%s, obfs-host=%s, tls-host=%s, udp-relay=true, tag=%s %s
+`,
+		ip, port,
+		proxyInfo[nodeCountry]["trojan"]["password"],
+		proxyInfo[nodeCountry]["trojan"]["path"],
+		proxyInfo[nodeCountry]["trojan"]["host"],
+		proxyInfo[nodeCountry]["trojan"]["host"],
+		country, nodeName))
+}
+
+func genLoonVlessUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`%s %s = vless, %s, %d, "%s", transport=ws, path=%s, host=%s, udp=true, over-tls=true, sni=%s
+`,
+		country, nodeName,
+		ip, port,
+		proxyInfo[nodeCountry]["vless"]["uuid"],
+		proxyInfo[nodeCountry]["vless"]["path"],
+		proxyInfo[nodeCountry]["vless"]["host"],
+		proxyInfo[nodeCountry]["vless"]["host"],
+	))
+}
+
+func genLoonVmessUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`%s %s = vmess, %s, %d, none, "%s", transport=ws, alterId=0, path=%s, host=%s, udp=true, over-tls=true, sni=%s
+`,
+		country, nodeName,
+		ip, port,
+		proxyInfo[nodeCountry]["vmess"]["uuid"],
+		proxyInfo[nodeCountry]["vmess"]["path"],
+		proxyInfo[nodeCountry]["vmess"]["host"],
+		proxyInfo[nodeCountry]["vmess"]["host"],
+	))
+}
+
+func genLoonTrojanUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	buf.WriteString(fmt.Sprintf(`%s %s = trojan, %s, %d, "%s", transport=ws, sni=%s, path=%s, host=%s, udp=true
+`,
+		country, nodeName,
 		ip, port,
 		proxyInfo[nodeCountry]["trojan"]["password"],
 		proxyInfo[nodeCountry]["trojan"]["host"],
