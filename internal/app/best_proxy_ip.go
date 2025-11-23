@@ -878,7 +878,7 @@ func SubNiceCfProxySub(format string, sub string, distNodeCountry string) (s str
 	}
 
 	// 处理每个国家的节点，并应用limit限制
-	for _, node := range bestCfNodeList {
+	for idx, node := range bestCfNodeList {
 		// 根据格式类型选择URL生成器
 		var generator func(*strings.Builder, config.ProxyInfo, string, string, string, string, int)
 		switch {
@@ -916,6 +916,8 @@ func SubNiceCfProxySub(format string, sub string, distNodeCountry string) (s str
 				continue
 			}
 		}
+
+		node.fragment = node.fragment + fmt.Sprintf(" %d", idx)
 
 		if generator != nil {
 			generator(&buf, proxyInfo, distNodeCountry, country, node.fragment, node.hostname, port)
