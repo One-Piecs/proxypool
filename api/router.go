@@ -435,7 +435,13 @@ func setupRouter() {
 		if c.Query("random") == "true" {
 			random = true
 		}
-		text, err := app.SubNiceProxyIp(format, distNodeCountry, c.Query("c"), limit, random)
+
+		isIPV6 := false
+		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
+			isIPV6 = true
+		}
+
+		text, err := app.SubNiceProxyIp(format, distNodeCountry, c.Query("c"), limit, random, isIPV6)
 		if err != nil {
 			c.String(500, err.Error())
 			return
@@ -457,7 +463,12 @@ func setupRouter() {
 			distNodeCountry = "JP"
 		}
 
-		text, err := app.SubNiceCfProxyIp(format, distNodeCountry)
+		isIPV6 := false
+		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
+			isIPV6 = true
+		}
+
+		text, err := app.SubNiceCfProxyIp(format, distNodeCountry, isIPV6)
 		if err != nil {
 			c.String(500, err.Error())
 			return
@@ -479,7 +490,12 @@ func setupRouter() {
 			distNodeCountry = "JP"
 		}
 
-		text, err := app.SubNiceCfProxyIpTop20(format, distNodeCountry, false)
+		isIPV6 := false
+		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
+			isIPV6 = true
+		}
+
+		text, err := app.SubNiceCfProxyIpTop20(format, distNodeCountry, false, isIPV6)
 		if err != nil {
 			c.String(500, err.Error())
 			return
@@ -501,7 +517,12 @@ func setupRouter() {
 			distNodeCountry = "JP"
 		}
 
-		text, err := app.SubNiceCfProxyIpTop20(format, distNodeCountry, true)
+		isIPV6 := false
+		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
+			isIPV6 = true
+		}
+
+		text, err := app.SubNiceCfProxyIpTop20(format, distNodeCountry, true, isIPV6)
 		if err != nil {
 			c.String(500, err.Error())
 			return
@@ -526,7 +547,12 @@ func setupRouter() {
 
 		isp := c.Query("isp")
 
-		text, err := app.SubNiceCfProxyIpProvider(format, isp, distNodeCountry)
+		isIPV6 := false
+		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
+			isIPV6 = true
+		}
+
+		text, err := app.SubNiceCfProxyIpProvider(format, isp, distNodeCountry, isIPV6)
 		if err != nil {
 			c.String(500, err.Error())
 			return
@@ -551,7 +577,12 @@ func setupRouter() {
 
 		sub := c.Query("sub")
 
-		text, err := app.SubNiceCfProxySub(format, sub, distNodeCountry)
+		isIPV6 := false
+		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
+			isIPV6 = true
+		}
+
+		text, err := app.SubNiceCfProxySub(format, sub, distNodeCountry, isIPV6)
 		if err != nil {
 			c.String(500, err.Error())
 			return
@@ -573,7 +604,13 @@ func setupRouter() {
 		if c.Query("random") == "true" {
 			random = true
 		}
-		text, err := app.SubNiceProxyIp(format, "KR", c.Query("c"), 0, random)
+
+		isIPV6 := false
+		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
+			isIPV6 = true
+		}
+
+		text, err := app.SubNiceProxyIp(format, "KR", c.Query("c"), 0, random, isIPV6)
 		if err != nil {
 			c.String(500, err.Error())
 			return

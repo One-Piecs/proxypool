@@ -199,7 +199,7 @@ func CrawlBestNode() {
 	log.Infoln("Completed processing %d nodes", len(bestNodeList))
 }
 
-func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode string, limit int, random bool) (s string, err error) {
+func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode string, limit int, random bool, isIPV6 bool) (s string, err error) {
 	// 使用defer来记录函数执行时间
 	start := time.Now()
 	defer func() {
@@ -326,6 +326,9 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 			}
 
 			if generator != nil {
+				if isIPV6 && !IsIPv6(node.Ip) {
+					continue
+				}
 				generator(&buf, proxyInfo, distNodeCountry, node.Country, node.Ip, node.Port)
 			}
 		}
@@ -334,7 +337,7 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 	return buf.String(), nil
 }
 
-func SubNiceCfProxyIp(format string, distNodeCountry string) (s string, err error) {
+func SubNiceCfProxyIp(format string, distNodeCountry string, isIPV6 bool) (s string, err error) {
 	// 使用defer来记录函数执行时间
 	start := time.Now()
 	defer func() {
@@ -419,6 +422,9 @@ func SubNiceCfProxyIp(format string, distNodeCountry string) (s string, err erro
 		country := geoIp.GeoIpDB.FindCountryIsoEmoji(distNodeCountry)
 
 		if generator != nil {
+			if isIPV6 && !IsIPv6(node) {
+				continue
+			}
 			generator(&buf, proxyInfo, distNodeCountry, country, node, 443)
 		}
 	}
@@ -458,7 +464,7 @@ type CfIpTop20 struct {
 }
 
 // SubNiceCfProxyIpTop20 获取 https://vps789.com/openApi/cfIpTop20
-func SubNiceCfProxyIpTop20(format string, distNodeCountry string, isConvertIp bool) (s string, err error) {
+func SubNiceCfProxyIpTop20(format string, distNodeCountry string, isConvertIp bool, isIPV6 bool) (s string, err error) {
 	// 使用defer来记录函数执行时间
 	start := time.Now()
 	defer func() {
@@ -575,6 +581,9 @@ func SubNiceCfProxyIpTop20(format string, distNodeCountry string, isConvertIp bo
 		country := geoIp.GeoIpDB.FindCountryIsoEmoji(distNodeCountry)
 
 		if generator != nil {
+			if isIPV6 && !IsIPv6(node) {
+				continue
+			}
 			generator(&buf, proxyInfo, distNodeCountry, country, node, 443)
 		}
 	}
@@ -651,7 +660,7 @@ type CfIpProvider struct {
 }
 
 // SubNiceCfProxyIpProvider 获取 https://vps789.com/openApi/cfIpApi
-func SubNiceCfProxyIpProvider(format string, isp string, distNodeCountry string) (s string, err error) {
+func SubNiceCfProxyIpProvider(format string, isp string, distNodeCountry string, isIPV6 bool) (s string, err error) {
 	// 使用defer来记录函数执行时间
 	start := time.Now()
 	defer func() {
@@ -780,6 +789,9 @@ func SubNiceCfProxyIpProvider(format string, isp string, distNodeCountry string)
 		country := geoIp.GeoIpDB.FindCountryIsoEmoji(distNodeCountry)
 
 		if generator != nil {
+			if isIPV6 && !IsIPv6(node) {
+				continue
+			}
 			generator(&buf, proxyInfo, distNodeCountry, country, node, 443)
 		}
 	}
@@ -794,7 +806,7 @@ type nodeBase struct {
 }
 
 // SubNiceCfProxySub 从 cf sub 订阅连接替换为自己的 IP
-func SubNiceCfProxySub(format string, sub string, distNodeCountry string) (s string, err error) {
+func SubNiceCfProxySub(format string, sub string, distNodeCountry string, isIPV6 bool) (s string, err error) {
 	// 使用defer来记录函数执行时间
 	start := time.Now()
 	defer func() {
@@ -920,6 +932,9 @@ func SubNiceCfProxySub(format string, sub string, distNodeCountry string) (s str
 		node.fragment = node.fragment + fmt.Sprintf(" %d", idx)
 
 		if generator != nil {
+			if isIPV6 && !IsIPv6(node.hostname) {
+				continue
+			}
 			generator(&buf, proxyInfo, distNodeCountry, country, node.fragment, node.hostname, port)
 		}
 	}
@@ -1251,4 +1266,15 @@ func genLoonTrojanUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCou
 		proxyInfo[nodeCountry]["trojan"]["path"],
 		proxyInfo[nodeCountry]["trojan"]["host"],
 	))
+}
+
+func IsIPv6(addr string) bool {
+	ipv6Addr := net.ParseIP(addr)
+
+	// 核心实现：
+	//
+	// 检查 IP 地址是否为 16 字节长，并且不能被 To4() 成功转换为 IPv4 地址。
+	// 如果 To4() 返回非 nil，则表示它是 IPv4 或 IPv4-mapped IPv6 地址。
+	// 只有当长度为 16 字节且 To4() 返回 nil 时，才是纯粹的 IPv6 地址。
+	return len(ipv6Addr) == net.IPv6len && ipv6Addr.To4() == nil
 }
