@@ -19,10 +19,6 @@ type Manager struct {
 
 var GlobalManager = &Manager{}
 
-func (m *Manager) Init() {
-	go m.Update()
-}
-
 func (m *Manager) Update() {
 	newRanges := make([]*net.IPNet, 0)
 	var wg sync.WaitGroup

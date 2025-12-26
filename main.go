@@ -61,7 +61,7 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
-	cdn.GlobalManager.Init()
+	cdn.GlobalManager.Update()
 
 	log.Infoln("Do the first crawl...")
 	go app.CrawlGo()            // 抓取主程序

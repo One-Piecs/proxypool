@@ -8,11 +8,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/metacubex/mihomo/common/utils"
-
 	"github.com/gammazero/workerpool"
 
 	"github.com/metacubex/mihomo/adapter"
+	"github.com/metacubex/mihomo/common/utils"
 
 	"github.com/One-Piecs/proxypool/pkg/proxy"
 )

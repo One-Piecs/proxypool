@@ -332,6 +332,8 @@ func IsCDN(ipStr string) bool {
 	keywords := []string{
 		"CDN", "Content Delivery", "Edge", "Anycast", "Cache",
 		"Akamai", "Incap", "Stackpath", "Bunny", "Zscaler", "Cloudflare", "Fastly",
+		"Microsoft", "Azure", "Amazon", "Google", "Edgio", "Edgecast", "Limelight",
+		"CacheFly", "CDNetworks", "ArvanCloud", "Tencent", "Alibaba",
 	}
 
 	orgUpper := strings.ToUpper(org)

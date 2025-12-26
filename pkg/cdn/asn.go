@@ -17,6 +17,8 @@ const ipApiBatchUrl = "http://ip-api.com/batch"
 var cdKeywords = []string{
 	"CDN", "Content Delivery", "Edge", "Anycast", "Cache",
 	"Akamai", "Incap", "Stackpath", "Bunny", "Zscaler", "Cloudflare", "Fastly",
+	"Microsoft", "Azure", "Amazon", "Google", "Edgio", "Edgecast", "Limelight",
+	"CacheFly", "CDNetworks", "ArvanCloud", "Tencent", "Alibaba",
 }
 
 type IPAPIResponse struct {
