@@ -419,10 +419,33 @@ func SubNiceCfProxyIp(format string, distNodeCountry string, isIPV6 bool) (s str
 	}
 
 	// 获取 cf_best_ip list
-	bestCfNodeList := config.Config().CfBestIp
-	if len(bestCfNodeList) == 0 {
+	rawBestCfNodeList := config.Config().CfBestIp
+	if len(rawBestCfNodeList) == 0 {
 		log.Errorln("No best cf nodes found")
 		return "", errors.New("not found best cf node list")
+	}
+
+	bestCfNodeList := make([]string, 0, len(rawBestCfNodeList))
+	for _, node := range rawBestCfNodeList {
+		if net.ParseIP(node) != nil {
+			bestCfNodeList = append(bestCfNodeList, node)
+			continue
+		}
+
+		// Try to resolve domain
+		ips, err := net.LookupIP(node)
+		if err != nil {
+			log.Errorln("Failed to resolve domain %s: %v", node, err)
+			continue
+		}
+		for _, ip := range ips {
+			bestCfNodeList = append(bestCfNodeList, ip.String())
+		}
+	}
+
+	if len(bestCfNodeList) == 0 {
+		log.Errorln("No valid IPs found after resolution")
+		return "", errors.New("no valid IPs found")
 	}
 
 	// 预分配buffer以提高性能
