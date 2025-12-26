@@ -20,10 +20,16 @@ import (
 var (
 	defaultURLTestTimeout = time.Second * 5
 	testURLs              = []string{
-		"http://bing.com/generate_204",
-		"http://www.gstatic.com/generate_204",
-		"http://maps.google.com/generate_204",
+		"http://www.msftconnecttest.com/connecttest.txt",
+		"http://captive.apple.com/hotspot-detect.html",
 		"http://www.google.com/generate_204",
+		"http://bing.com/generate_204",
+		"http://play.googleapis.com/generate_204",
+		"http://clients3.google.com/generate_204",
+		"http://www.msftncsi.com/ncsi.txt",
+		"http://edge-http.microsoft.com/captiveportal/generate_204",
+		"http://www.apple.com/library/test/success.html",
+		"http://apple-cloudkit.com/generate_204",
 	}
 	maxRetries = 2
 )
