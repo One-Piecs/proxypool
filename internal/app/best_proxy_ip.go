@@ -21,6 +21,7 @@ import (
 	"github.com/One-Piecs/proxypool/config"
 	"github.com/One-Piecs/proxypool/internal/cache"
 	"github.com/One-Piecs/proxypool/log"
+	"github.com/One-Piecs/proxypool/pkg/cdn"
 	"github.com/One-Piecs/proxypool/pkg/geoIp"
 	"github.com/One-Piecs/proxypool/pkg/tool"
 	"github.com/gammazero/workerpool"
@@ -113,6 +114,59 @@ func CrawlBestNode() {
 
 	log.Infoln("Total unique addresses: %d", len(addrAll))
 
+	// Pre-process IPs for CDN check
+	ipsToCheck := make([]string, 0)
+	// Actually we just need a map of IP -> isCDN
+	cdnMap := make(map[string]bool)
+
+	for _, addr := range addrAll {
+		// Extract IP logic duplicated from below, consider helper or just doing simple parse here
+		// For simplicity, let's just do a quick parse or rely on the below loop.
+		// But we want to do batch check BEFORE worker pool starts.
+
+		ip := ""
+		h := strings.Split(addr, "]:")
+		if len(h) == 2 {
+			ip = strings.ReplaceAll(h[0], "[", "")
+		} else {
+			h := strings.Split(addr, ":")
+			if len(h) == 2 {
+				ip = h[0]
+			}
+		}
+
+		if ip != "" {
+			// Priority 1: Check IP Ranges (Fastest, Local)
+			if cdn.GlobalManager.IsCDN(ip) {
+				cdnMap[ip] = true
+				continue
+			}
+
+			// Priority 2: Check Local ASN DB (Fast, Local)
+			if geoIp.IsCDN(ip) {
+				cdnMap[ip] = true
+				continue
+			}
+
+			// Priority 3: Online API (Slow, External) -> Add to batch list
+			ipsToCheck = append(ipsToCheck, ip)
+		}
+	}
+
+	if len(ipsToCheck) > 0 {
+		log.Infoln("Checking ASN for %d IPs", len(ipsToCheck))
+		asnResults, err := cdn.CheckIPsForCDN(ipsToCheck)
+		if err != nil {
+			log.Errorln("ASN check failed: %v", err)
+		} else {
+			for ip, isCDN := range asnResults {
+				if isCDN {
+					cdnMap[ip] = true
+				}
+			}
+		}
+	}
+
 	// 使用workerpool处理IP检测
 	wp = workerpool.New(20)
 	mux := sync.Mutex{}
@@ -156,11 +210,15 @@ func CrawlBestNode() {
 				return
 			}
 
+			// Check if IP is CDN (using pre-calculated map)
+			isCDN := cdnMap[ip]
+
 			// 创建节点
 			node := cache.BestNode{
 				Ip:      ip,
 				Port:    port,
 				Country: country,
+				CDN:     isCDN,
 			}
 
 			mux.Lock()
@@ -199,7 +257,7 @@ func CrawlBestNode() {
 	log.Infoln("Completed processing %d nodes", len(bestNodeList))
 }
 
-func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode string, limit int, random bool, isIPV6 bool) (s string, err error) {
+func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode string, limit int, random bool, isIPV6 bool, cdnFilter string) (s string, err error) {
 	// 使用defer来记录函数执行时间
 	start := time.Now()
 	defer func() {
@@ -298,6 +356,15 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 
 		for i := 0; i < nodeLimit; i++ {
 			node := nodes[i]
+
+			// Filter based on cdnFilter
+			if cdnFilter == "true" && !node.CDN {
+				continue
+			}
+			if cdnFilter == "false" && node.CDN {
+				continue
+			}
+
 			// 根据格式类型选择URL生成器
 			var generator func(*strings.Builder, config.ProxyInfo, string, string, string, int)
 			switch {

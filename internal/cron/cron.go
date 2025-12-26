@@ -7,6 +7,7 @@ import (
 	"github.com/One-Piecs/proxypool/internal/app"
 	"github.com/One-Piecs/proxypool/internal/cache"
 	"github.com/One-Piecs/proxypool/log"
+	"github.com/One-Piecs/proxypool/pkg/cdn"
 	"github.com/One-Piecs/proxypool/pkg/geoIp"
 	"github.com/One-Piecs/proxypool/pkg/healthcheck"
 	"github.com/One-Piecs/proxypool/pkg/provider"
@@ -18,6 +19,8 @@ func Cron() {
 	_ = gocron.Every(config.Config().SpeedTestInterval).Minutes().Do(speedTestTask)
 	_ = gocron.Every(config.Config().ActiveInterval).Minutes().Do(frequentSpeedTestTask)
 	_ = gocron.Every(1).Day().At("04:30").Do(geoIp.UpdateGeoIP)
+	_ = gocron.Every(1).Day().At("04:35").Do(geoIp.UpdateGeoIpASNDB)
+	_ = gocron.Every(1).Day().At("04:40").Do(cdn.GlobalManager.Update)
 	_ = gocron.Every(config.Config().SubBestNodeInterval).Minutes().Do(CrawlBestNodeTask)
 	<-gocron.Start()
 }

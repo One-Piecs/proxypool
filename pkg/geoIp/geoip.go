@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/One-Piecs/proxypool/config"
 	"github.com/One-Piecs/proxypool/log"
@@ -42,6 +43,7 @@ func InitGeoIpDB() error {
 	// https://raw.githubusercontent.com/alecthw/mmdb_china_ip_list/release/Country.mmdb
 	// http://www.ideame.top/mmdb/version
 	GeoIpDB = NewGeoIP("assets/Country.mmdb", "assets/flags.json")
+	InitGeoIpASNDB()
 	return nil
 }
 
@@ -70,7 +72,7 @@ func NewGeoIP(geodb, flags string) (geoip GeoIP) {
 	db, err := geoip2.Open(geodb)
 	if err != nil {
 		// log.Println(err)
-		buf, err := GeoIpBinary(config.Config().GeoipDbUrl + "lite/Country.mmdb")
+		buf, err := GeoIpBinary(config.Config().GeoipDbUrl + "Country.mmdb")
 		if err != nil {
 			panic(err)
 		}
@@ -242,4 +244,101 @@ func (g GeoIP) Find(ipORdomain string) (ip, country string, err error) {
 
 func (g GeoIP) FindCountryIsoEmoji(countryIsoCode string) string {
 	return g.emojiMap[countryIsoCode]
+}
+
+var GeoIpASNDB *geoip2.Reader
+
+// UpdateGeoIpASNDB Force download daily
+func UpdateGeoIpASNDB() {
+	dbPath := "assets/GeoLite2-ASN.mmdb"
+	downloadUrl := "https://git.io/GeoLite2-ASN.mmdb"
+
+	log.Infoln("Starting daily ASN DB update...")
+
+	resp, err := http.Get(downloadUrl)
+	if err != nil {
+		log.Errorln("Failed to download ASN DB: %v", err)
+	} else {
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			data, err := ioutil.ReadAll(resp.Body)
+			if err == nil {
+				if err := ioutil.WriteFile(dbPath, data, 0644); err == nil {
+					log.Infoln("ASN DB downloaded and updated successfully")
+
+					// Reload DB
+					db, err := geoip2.Open(dbPath)
+					if err != nil {
+						log.Errorln("ASN DB reload failed: %v", err)
+						return
+					}
+
+					if GeoIpASNDB != nil {
+						GeoIpASNDB.Close()
+					}
+					GeoIpASNDB = db
+					log.Infoln("ASN DB reloaded successfully")
+				} else {
+					log.Errorln("Failed to write ASN DB: %v", err)
+				}
+			} else {
+				log.Errorln("Failed to read ASN DB body: %v", err)
+			}
+		} else {
+			log.Errorln("Failed to download ASN DB, status: %d", resp.StatusCode)
+		}
+	}
+
+	// Ensure DB is loaded if it wasn't already (e.g. startup)
+	if GeoIpASNDB == nil {
+		db, err := geoip2.Open(dbPath)
+		if err != nil {
+			log.Infoln("ASN DB load failed (optional): %v", err)
+			return
+		}
+		GeoIpASNDB = db
+		log.Infoln("ASN DB initial load success")
+	}
+}
+
+func InitGeoIpASNDB() {
+	UpdateGeoIpASNDB()
+}
+
+// GetASN returns the ASN organization for an IP
+func GetASN(ipStr string) (string, error) {
+	if GeoIpASNDB == nil {
+		return "", fmt.Errorf("ASN DB not loaded")
+	}
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return "", fmt.Errorf("invalid IP")
+	}
+	record, err := GeoIpASNDB.ASN(ip)
+	if err != nil {
+		return "", err
+	}
+	return record.AutonomousSystemOrganization, nil
+}
+
+// IsCDN checks if the IP belongs to a CDN based on local ASN DB
+func IsCDN(ipStr string) bool {
+	org, err := GetASN(ipStr)
+	if err != nil {
+		return false
+	}
+
+	// Keywords to detect CDN (same as in pkg/cdn/asn.go but for local check)
+	keywords := []string{
+		"CDN", "Content Delivery", "Edge", "Anycast", "Cache",
+		"Akamai", "Incap", "Stackpath", "Bunny", "Zscaler", "Cloudflare", "Fastly",
+	}
+
+	orgUpper := strings.ToUpper(org)
+	for _, kw := range keywords {
+		if strings.Contains(orgUpper, strings.ToUpper(kw)) {
+			return true
+		}
+	}
+	return false
 }

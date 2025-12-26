@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/gops/agent"
 
+	"github.com/One-Piecs/proxypool/pkg/cdn"
 	"github.com/One-Piecs/proxypool/pkg/geoIp"
 
 	"github.com/One-Piecs/proxypool/api"
@@ -60,6 +61,8 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
+	cdn.GlobalManager.Init()
+
 	log.Infoln("Do the first crawl...")
 	go app.CrawlGo()            // 抓取主程序
 	go cron.Cron()              // 定时运行

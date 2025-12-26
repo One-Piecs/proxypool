@@ -11,6 +11,7 @@ type BestNode struct {
 	Ip      string
 	Port    int
 	Country string
+	CDN     bool
 }
 
 var c = cache.New(cache.NoExpiration, 10*time.Minute)

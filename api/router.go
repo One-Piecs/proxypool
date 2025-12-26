@@ -441,7 +441,9 @@ func setupRouter() {
 			isIPV6 = true
 		}
 
-		text, err := app.SubNiceProxyIp(format, distNodeCountry, c.Query("c"), limit, random, isIPV6)
+		cdnFilter := c.Query("cdn")
+
+		text, err := app.SubNiceProxyIp(format, distNodeCountry, c.Query("c"), limit, random, isIPV6, cdnFilter)
 		if err != nil {
 			c.String(500, err.Error())
 			return
@@ -610,7 +612,7 @@ func setupRouter() {
 			isIPV6 = true
 		}
 
-		text, err := app.SubNiceProxyIp(format, "KR", c.Query("c"), 0, random, isIPV6)
+		text, err := app.SubNiceProxyIp(format, "KR", c.Query("c"), 0, random, isIPV6, c.Query("cdn"))
 		if err != nil {
 			c.String(500, err.Error())
 			return
