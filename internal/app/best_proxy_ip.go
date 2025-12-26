@@ -114,6 +114,34 @@ func CrawlBestNode() {
 
 	log.Infoln("Total unique addresses: %d", len(addrAll))
 
+	// Resolve domains to IPs
+	resolvedAddrAll := make([]string, 0, len(addrAll))
+	for _, addr := range addrAll {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			log.Errorln("Failed to split host port for %s: %v", addr, err)
+			continue
+		}
+
+		if net.ParseIP(host) != nil {
+			resolvedAddrAll = append(resolvedAddrAll, addr)
+			continue
+		}
+
+		// It's a domain, resolve it
+		ips, err := net.LookupIP(host)
+		if err != nil {
+			log.Errorln("Failed to resolve domain %s: %v", host, err)
+			continue
+		}
+
+		for _, ip := range ips {
+			resolvedAddrAll = append(resolvedAddrAll, net.JoinHostPort(ip.String(), port))
+		}
+	}
+	addrAll = resolvedAddrAll
+	log.Infoln("Total addresses after resolution: %d", len(addrAll))
+
 	// Pre-process IPs for CDN check
 	ipsToCheck := make([]string, 0)
 	// Actually we just need a map of IP -> isCDN
@@ -200,9 +228,9 @@ func CrawlBestNode() {
 				}
 			}
 
-			if ip == "cf.090227.xyz" {
-				return
-			}
+			// if ip == "cf.090227.xyz" {
+			// 	return
+			// }
 
 			_, country, err := geoIp.GeoIpDB.Find(ip)
 			if err != nil {
@@ -419,33 +447,10 @@ func SubNiceCfProxyIp(format string, distNodeCountry string, isIPV6 bool) (s str
 	}
 
 	// 获取 cf_best_ip list
-	rawBestCfNodeList := config.Config().CfBestIp
-	if len(rawBestCfNodeList) == 0 {
+	bestCfNodeList := config.Config().CfBestIp
+	if len(bestCfNodeList) == 0 {
 		log.Errorln("No best cf nodes found")
 		return "", errors.New("not found best cf node list")
-	}
-
-	bestCfNodeList := make([]string, 0, len(rawBestCfNodeList))
-	for _, node := range rawBestCfNodeList {
-		if net.ParseIP(node) != nil {
-			bestCfNodeList = append(bestCfNodeList, node)
-			continue
-		}
-
-		// Try to resolve domain
-		ips, err := net.LookupIP(node)
-		if err != nil {
-			log.Errorln("Failed to resolve domain %s: %v", node, err)
-			continue
-		}
-		for _, ip := range ips {
-			bestCfNodeList = append(bestCfNodeList, ip.String())
-		}
-	}
-
-	if len(bestCfNodeList) == 0 {
-		log.Errorln("No valid IPs found after resolution")
-		return "", errors.New("no valid IPs found")
 	}
 
 	// 预分配buffer以提高性能
