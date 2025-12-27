@@ -492,12 +492,17 @@ func setupRouter() {
 			distNodeCountry = "JP"
 		}
 
+		isConvertIp := false
+		if c.Query("ips") == "true" || c.Query("ips") == "1" {
+			isConvertIp = true
+		}
+
 		isIPV6 := false
 		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
 			isIPV6 = true
 		}
 
-		text, err := app.SubNiceCfProxyIpTop20(format, distNodeCountry, false, isIPV6)
+		text, err := app.SubNiceCfProxyIpTop20(format, distNodeCountry, isConvertIp, isIPV6)
 		if err != nil {
 			c.String(500, err.Error())
 			return
