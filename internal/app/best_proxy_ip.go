@@ -612,6 +612,8 @@ func SubNiceCfProxyIpTop20(format string, distNodeCountry string, isConvertIp bo
 		}
 	}
 
+	bestCfNodeList = Unique(bestCfNodeList)
+
 	// 预分配buffer以提高性能
 	buf := strings.Builder{}
 	buf.Grow(len(bestCfNodeList) * 30) // 预估每个节点约30字节
@@ -1372,4 +1374,16 @@ func IsIPv6(addr string) bool {
 	// 如果 To4() 返回非 nil，则表示它是 IPv4 或 IPv4-mapped IPv6 地址。
 	// 只有当长度为 16 字节且 To4() 返回 nil 时，才是纯粹的 IPv6 地址。
 	return len(ipv6Addr) == net.IPv6len && ipv6Addr.To4() == nil
+}
+
+func Unique[T comparable](s []T) []T {
+	inGeneric := make(map[T]struct{})
+	var result []T
+	for _, v := range s {
+		if _, ok := inGeneric[v]; !ok {
+			inGeneric[v] = struct{}{}
+			result = append(result, v)
+		}
+	}
+	return result
 }
