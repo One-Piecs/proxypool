@@ -41,66 +41,129 @@ type Format struct {
 
 func CrawlBestNode() {
 	urls := config.Config().SubIpUrl
-	if len(urls) == 0 {
-		log.Errorln("not found sub url")
-		return
-	}
-
 	addrMap := sync.Map{}
 	bestNodeList := make([]cache.BestNode, 0, 200)
 
-	// 使用workerpool进行并发处理
-	wp := workerpool.New(10) // 设置合适的并发数
+	// Fetch from all sources concurrently
+	wp := workerpool.New(10)
 	wg := &sync.WaitGroup{}
-	var err error
 
-	for _, _url := range urls {
-		wg.Add(1)
-		_url := _url // 创建副本避免闭包问题
-		wp.Submit(func() {
-			defer wg.Done()
-			log.Infoln("Starting: %s", _url)
+	// 1. Subscription URLs
+	if len(urls) > 0 {
+		for _, _url := range urls {
+			wg.Add(1)
+			_url := _url
+			wp.Submit(func() {
+				defer wg.Done()
+				log.Infoln("Starting Sub URL: %s", _url)
 
-			// 添加重试机制
-			for retries := 0; retries < 3; retries++ {
-				resp, err := resty.New().SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true}).R().
-					SetQueryParams(map[string]string{
-						"host":       "p.laibbb.top",
-						"uuid":       "e4e08238-e42c-4288-8f67-e2994ec18c90",
-						"pw":         "e4e08238",
-						"path":       "/webhook",
-						"edgetunnel": "cmliu",
-					}).
-					SetHeader("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36").
-					Get(_url)
-				if err != nil {
-					log.Errorln("resty.Get(): %s, retry: %d", err.Error(), retries)
-					time.Sleep(time.Second * time.Duration(retries+1))
-					continue
-				}
-
-				de64, err := base64.StdEncoding.DecodeString(resp.String())
-				if err != nil {
-					log.Errorln("url[%s] base64.StdEncoding.DecodeString(): %s, retry: %d", _url, err.Error(), retries)
-					time.Sleep(time.Second * time.Duration(retries+1))
-					continue
-				}
-
-				r := bufio.NewScanner(bytes.NewReader(de64))
-				for r.Scan() {
-					addr, err := ExtractHostPort(r.Text())
+				for retries := 0; retries < 3; retries++ {
+					resp, err := resty.New().SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true}).R().
+						SetQueryParams(map[string]string{
+							"host":       "p.laibbb.top",
+							"uuid":       "e4e08238-e42c-4288-8f67-e2994ec18c90",
+							"pw":         "e4e08238",
+							"path":       "/webhook",
+							"edgetunnel": "cmliu",
+						}).
+						SetHeader("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36").
+						Get(_url)
 					if err != nil {
-						log.Errorln("ExtractHostPort: %s", err.Error())
+						log.Errorln("resty.Get(): %s, retry: %d", err.Error(), retries)
+						time.Sleep(time.Second * time.Duration(retries+1))
 						continue
 					}
-					// 使用sync.Map进行去重
-					addrMap.Store(addr, struct{}{})
+
+					de64, err := base64.StdEncoding.DecodeString(resp.String())
+					if err != nil {
+						log.Errorln("url[%s] base64 decode error: %s", _url, err.Error())
+						time.Sleep(time.Second * time.Duration(retries+1))
+						continue
+					}
+
+					r := bufio.NewScanner(bytes.NewReader(de64))
+					count := 0
+					for r.Scan() {
+						addr, err := ExtractHostPort(r.Text())
+						if err != nil {
+							continue
+						}
+						addrMap.Store(addr, struct{}{})
+						count++
+					}
+					log.Infoln("Processed %s, found %d nodes", _url, count)
+					break
 				}
-				break
-			}
-			log.Infoln("End: %s", _url)
-		})
+			})
+		}
+	} else {
+		log.Errorln("not found sub url")
 	}
+
+	// 2. CF Best IPs from Config
+	wg.Add(1)
+	wp.Submit(func() {
+		defer wg.Done()
+		cfIps := config.Config().CfBestIp
+		if len(cfIps) > 0 {
+			log.Infoln("Adding %d CF Best IPs from config", len(cfIps))
+			for _, ip := range cfIps {
+				// Assuming standard port 443 for these if not specified?
+				// SubNiceCfProxyIp passes 443. Let's append default port if missing.
+				// However ExtractHostPort might expect port.
+				// Let's manually store with :443 if standard IP
+				if !strings.Contains(ip, ":") {
+					addrMap.Store(net.JoinHostPort(ip, "443"), struct{}{})
+				} else {
+					addrMap.Store(ip, struct{}{})
+				}
+			}
+		}
+	})
+
+	// 3. CF Top 20 from vps789
+	wg.Add(1)
+	wp.Submit(func() {
+		defer wg.Done()
+		log.Infoln("Fetching CF Top 20...")
+		ips, err := fetchCfIpTop20()
+		if err != nil {
+			log.Errorln("fetchCfIpTop20 failed: %v", err)
+			return
+		}
+		log.Infoln("Got %d IPs from Top 20", len(ips))
+		for _, ip := range ips {
+			if !strings.Contains(ip, ":") {
+				addrMap.Store(net.JoinHostPort(ip, "443"), struct{}{})
+			} else {
+				addrMap.Store(ip, struct{}{})
+			}
+		}
+	})
+
+	// 4. CF Provider IPs from vps789
+	wg.Add(1)
+	wp.Submit(func() {
+		defer wg.Done()
+		log.Infoln("Fetching CF Provider IPs...")
+		// Fetch for all ISPs
+		isps := []string{"CT", "CU", "CM"}
+		for _, isp := range isps {
+			ips, err := fetchCfIpProvider(isp)
+			if err != nil {
+				log.Errorln("fetchCfIpProvider(%s) failed: %v", isp, err)
+				continue
+			}
+			log.Infoln("Got %d IPs for %s", len(ips), isp)
+			for _, ip := range ips {
+				if !strings.Contains(ip, ":") {
+					addrMap.Store(net.JoinHostPort(ip, "443"), struct{}{})
+				} else {
+					addrMap.Store(ip, struct{}{})
+				}
+			}
+		}
+	})
 
 	wg.Wait()
 	wp.Stop()
@@ -202,6 +265,7 @@ func CrawlBestNode() {
 	for _, addr := range addrAll {
 		addr := addr // 创建副本
 		wp.Submit(func() {
+			var err error
 			ip := ""
 			port := 0
 			h := strings.Split(addr, "]:")
@@ -580,35 +644,30 @@ func SubNiceCfProxyIpTop20(format string, distNodeCountry string, isConvertIp bo
 	// 	return "", errors.New("not found best cf node list")
 	// }
 
-	resp, err := tool.GetHttpClient().Get("https://vps789.com/openApi/cfIpTop20")
+	// 	log.Errorln("get cfIpTop20 failed: %v", err)
+	// 	return "", fmt.Errorf("get cfIpTop20 failed: %w", err)
+	// }
+	// defer resp.Body.Close()
+	// ... (replaced by helper)
+
+	ips, err := fetchCfIpTop20()
 	if err != nil {
-		log.Errorln("get cfIpTop20 failed: %v", err)
-		return "", fmt.Errorf("get cfIpTop20 failed: %w", err)
+		log.Errorln("fetchCfIpTop20 failed: %v", err)
+		return "", err
 	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Errorln("get cfIpTop20 readall: %v", err)
-		return "", fmt.Errorf("get cfIpTop20 readall: %w", err)
-	}
-	var top20 CfIpTop20
-	err = json.Unmarshal(body, &top20)
-	if err != nil {
-		log.Errorln("cfIpTop20 body json format: %v", err)
-		return "", fmt.Errorf("cfIpTop20 body json format: %w", err)
-	}
+
 	bestCfNodeList := make([]string, 0, 20)
-	for _, good := range top20.Data.Good {
+	for _, ip := range ips {
 		if isConvertIp {
-			ips, err := net.LookupIP(good.Ip)
+			resolvedIPs, err := net.LookupIP(ip)
 			if err != nil {
 				return "", fmt.Errorf("DNS查询失败: %w", err)
 			}
-			for _, ip := range ips {
-				bestCfNodeList = append(bestCfNodeList, ip.String())
+			for _, rip := range resolvedIPs {
+				bestCfNodeList = append(bestCfNodeList, rip.String())
 			}
 		} else {
-			bestCfNodeList = append(bestCfNodeList, good.Ip)
+			bestCfNodeList = append(bestCfNodeList, ip)
 		}
 	}
 
@@ -778,48 +837,11 @@ func SubNiceCfProxyIpProvider(format string, isp string, distNodeCountry string,
 	// 	return "", errors.New("not found best cf node list")
 	// }
 
-	resp, err := tool.GetHttpClient().Get("https://vps789.com/openApi/cfIpApi")
+	// Fetch IPs using helper
+	bestCfNodeList, err := fetchCfIpProvider(isp)
 	if err != nil {
-		log.Errorln("get cfIpApi failed: %v", err)
-		return "", fmt.Errorf("get cfIpApi failed: %w", err)
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Errorln("get cfIpApi readall: %v", err)
-		return "", fmt.Errorf("get cfIpApi readall: %w", err)
-	}
-	var provider CfIpProvider
-	err = json.Unmarshal(body, &provider)
-	if err != nil {
-		log.Errorln("cfIpApi body json format: %v", err)
-		return "", fmt.Errorf("cfIpApi body json format: %w", err)
-	}
-	bestCfNodeList := make([]string, 0, 20)
-
-	switch isp {
-	case "CT":
-		for _, good := range provider.Data.CT {
-			bestCfNodeList = append(bestCfNodeList, good.Ip)
-		}
-	case "CU":
-		for _, good := range provider.Data.CU {
-			bestCfNodeList = append(bestCfNodeList, good.Ip)
-		}
-	case "CM":
-		for _, good := range provider.Data.CM {
-			bestCfNodeList = append(bestCfNodeList, good.Ip)
-		}
-	default:
-		for _, good := range provider.Data.CT {
-			bestCfNodeList = append(bestCfNodeList, good.Ip)
-		}
-		for _, good := range provider.Data.CU {
-			bestCfNodeList = append(bestCfNodeList, good.Ip)
-		}
-		for _, good := range provider.Data.CM {
-			bestCfNodeList = append(bestCfNodeList, good.Ip)
-		}
+		log.Errorln("fetchCfIpProvider failed: %v", err)
+		return "", err
 	}
 
 	// 预分配buffer以提高性能
@@ -894,6 +916,86 @@ func SubNiceCfProxyIpProvider(format string, isp string, distNodeCountry string,
 	}
 
 	return buf.String(), nil
+}
+
+// ---------------- Helper Functions for Fetching Data ----------------
+
+func fetchCfIpTop20() ([]string, error) {
+	resp, err := tool.GetHttpClient().Get("https://vps789.com/openApi/cfIpTop20")
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read body failed: %w", err)
+	}
+
+	var top20 CfIpTop20
+	if err := json.Unmarshal(body, &top20); err != nil {
+		return nil, fmt.Errorf("json unmarshal failed: %w", err)
+	}
+
+	var ips []string
+	for _, good := range top20.Data.Good {
+		ips = append(ips, good.Ip)
+	}
+	return ips, nil
+}
+
+func fetchCfIpProvider(isp string) ([]string, error) {
+	resp, err := tool.GetHttpClient().Get("https://vps789.com/openApi/cfIpApi")
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read body failed: %w", err)
+	}
+
+	var provider CfIpProvider
+	if err := json.Unmarshal(body, &provider); err != nil {
+		return nil, fmt.Errorf("json unmarshal failed: %w", err)
+	}
+
+	var ips []string
+	var targets []struct {
+		Ip               string  `json:"ip"`
+		YdLatencyAvg     float64 `json:"ydLatencyAvg"`
+		YdPkgLostRateAvg float64 `json:"ydPkgLostRateAvg"`
+		LtLatencyAvg     float64 `json:"ltLatencyAvg"`
+		LtPkgLostRateAvg float64 `json:"ltPkgLostRateAvg"`
+		DxLatencyAvg     float64 `json:"dxLatencyAvg"`
+		DxPkgLostRateAvg float64 `json:"dxPkgLostRateAvg"`
+		DownloadSpeed    int     `json:"downloadSpeed"`
+		CreatedTime      string  `json:"createdTime"`
+		AvgScore         int     `json:"avgScore"`
+		YdScore          int     `json:"ydScore"`
+		DxScore          int     `json:"dxScore"`
+		LtScore          int     `json:"ltScore"`
+	}
+
+	switch isp {
+	case "CT":
+		targets = provider.Data.CT
+	case "CU":
+		targets = provider.Data.CU
+	case "CM":
+		targets = provider.Data.CM
+	default:
+		// Collect all
+		targets = append(targets, provider.Data.CT...)
+		targets = append(targets, provider.Data.CU...)
+		targets = append(targets, provider.Data.CM...)
+	}
+
+	for _, item := range targets {
+		ips = append(ips, item.Ip)
+	}
+	return ips, nil
 }
 
 type nodeBase struct {
