@@ -1250,7 +1250,7 @@ func genSurgeTrojanUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCou
 }
 
 func genClashVlessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
-	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %s:%d", "type":"vless", "server":"%s", "port":%d, "uuid":"%v", "network":"ws", "tls":true, "udp":true, "sni":"%v", "client-fingerprint":"chrome", "ws-opts":{"path":"%v", "headers":{"Host":"%v"}}}
+	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %s:%d", "type":"vless", "server":"%s", "port":%d, "uuid":"%v", "network":"ws", "tls":true, "udp":true, "servername":"%v", "client-fingerprint":"chrome", "ws-opts":{"path":"%v", "headers":{"Host":"%v"}}}
 `,
 		country, ip, port, ip, port,
 		proxyInfo[nodeCountry]["vless"]["uuid"],
@@ -1369,7 +1369,7 @@ func genSurgeTrojanUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCo
 }
 
 func genClashVlessUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
-	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %s", "type":"vless", "server":"%s", "port":%d, "uuid":"%v", "network":"ws", "tls":true, "udp":true, "sni":"%v", "client-fingerprint":"chrome", "ws-opts":{"path":"%v", "headers":{"Host":"%v"}}}
+	buf.WriteString(fmt.Sprintf(`  - {"name":"%s %s", "type":"vless", "server":"%s", "port":%d, "uuid":"%v", "network":"ws", "tls":true, "udp":true, "servername":"%v", "client-fingerprint":"chrome", "ws-opts":{"path":"%v", "headers":{"Host":"%v"}}}
 `,
 		country, nodeName, ip, port,
 		proxyInfo[nodeCountry]["vless"]["uuid"],
