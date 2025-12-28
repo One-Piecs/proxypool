@@ -282,6 +282,55 @@ func setupRouter() {
 		c.String(200, text)
 	})
 
+	router.GET("/v2rayn/proxies", func(c *gin.Context) {
+		proxyTypes := c.DefaultQuery("type", "")
+		proxyCountry := c.DefaultQuery("c", "")
+		proxyNotCountry := c.DefaultQuery("nc", "")
+		proxySpeed := c.DefaultQuery("speed", "")
+		proxyFilter := c.DefaultQuery("filter", "")
+		text := ""
+		if proxyTypes == "" && proxyCountry == "" && proxyNotCountry == "" && proxySpeed == "" && proxyFilter == "" {
+			text = appcache.GetString("v2raynproxies")
+			if text == "" {
+				proxies := appcache.GetProxies("proxies")
+				v2rayn := provider.V2rayn{
+					Base: provider.Base{
+						Proxies: &proxies,
+					},
+				}
+				text = v2rayn.Provide()
+				appcache.SetString("v2raynproxies", text)
+			}
+		} else if proxyTypes == "all" {
+			proxies := appcache.GetProxies("allproxies")
+			v2rayn := provider.V2rayn{
+				Base: provider.Base{
+					Proxies:    &proxies,
+					Types:      proxyTypes,
+					Country:    proxyCountry,
+					NotCountry: proxyNotCountry,
+					Speed:      proxySpeed,
+					Filter:     proxyFilter,
+				},
+			}
+			text = v2rayn.Provide()
+		} else {
+			proxies := appcache.GetProxies("proxies")
+			v2rayn := provider.V2rayn{
+				Base: provider.Base{
+					Proxies:    &proxies,
+					Types:      proxyTypes,
+					Country:    proxyCountry,
+					NotCountry: proxyNotCountry,
+					Speed:      proxySpeed,
+					Filter:     proxyFilter,
+				},
+			}
+			text = v2rayn.Provide()
+		}
+		c.String(200, text)
+	})
+
 	router.GET("/ss/sub", func(c *gin.Context) {
 		proxies := appcache.GetProxies("proxies")
 		ssSub := provider.SSSub{
