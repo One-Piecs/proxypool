@@ -37,6 +37,7 @@ type Format struct {
 	Vmess  bool
 	Trojan bool
 	Vless  bool
+	V2rayn bool
 }
 
 func CrawlBestNode() {
@@ -375,11 +376,12 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 	buf.Grow(len(bestNodeList) * 200) // 预估每个节点约200字节
 
 	// 写入头部信息
-	buf.WriteString("# " + cache.GetString("bestNodeLastUpdateTime") + "\n")
-	if f.Clash {
-		buf.WriteString("proxies:\n")
+	if !f.V2rayn {
+		buf.WriteString("# " + cache.GetString("bestNodeLastUpdateTime") + "\n")
+		if f.Clash {
+			buf.WriteString("proxies:\n")
+		}
 	}
-
 	// 优化国家代码过滤
 	var countryFilter map[string]struct{}
 	if proxyCountryIsoCode != "" {
@@ -398,17 +400,20 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 
 	// 使用函数映射来简化URL生成逻辑
 	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, int){
-		"surge_vmess":  genSurgeVmessUrl,
-		"surge_trojan": genSurgeTrojanUrl,
-		"clash_vmess":  genClashVmessUrl,
-		"clash_trojan": genClashTrojanUrl,
-		"clash_vless":  genClashVlessUrl,
-		"quanx_vmess":  genQuanXVmessUrl,
-		"quanx_trojan": genQuanXTrojanUrl,
-		"quanx_vless":  genQuanXVlessUrl,
-		"loon_vmess":   genLoonVmessUrl,
-		"loon_trojan":  genLoonTrojanUrl,
-		"loon_vless":   genLoonVlessUrl,
+		"surge_vmess":   genSurgeVmessUrl,
+		"surge_trojan":  genSurgeTrojanUrl,
+		"clash_vmess":   genClashVmessUrl,
+		"clash_trojan":  genClashTrojanUrl,
+		"clash_vless":   genClashVlessUrl,
+		"quanx_vmess":   genQuanXVmessUrl,
+		"quanx_trojan":  genQuanXTrojanUrl,
+		"quanx_vless":   genQuanXVlessUrl,
+		"loon_vmess":    genLoonVmessUrl,
+		"loon_trojan":   genLoonTrojanUrl,
+		"loon_vless":    genLoonVlessUrl,
+		"v2rayn_vmess":  genV2raynVmessUrl,
+		"v2rayn_trojan": genV2raynTrojanUrl,
+		"v2rayn_vless":  genV2raynVlessUrl,
 	}
 
 	// 按国家分组节点
@@ -482,6 +487,12 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 				generator = urlGenerators["loon_trojan"]
 			case f.Loon && f.Vless:
 				generator = urlGenerators["loon_vless"]
+			case f.V2rayn && f.Vmess:
+				generator = urlGenerators["v2rayn_vmess"]
+			case f.V2rayn && f.Trojan:
+				generator = urlGenerators["v2rayn_trojan"]
+			case f.V2rayn && f.Vless:
+				generator = urlGenerators["v2rayn_vless"]
 			}
 
 			if generator != nil {
@@ -493,6 +504,9 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 		}
 	}
 
+	if f.V2rayn {
+		return base64.StdEncoding.EncodeToString([]byte(buf.String())), nil
+	}
 	return buf.String(), nil
 }
 
@@ -522,9 +536,11 @@ func SubNiceCfProxyIp(format string, distNodeCountry string, isIPV6 bool) (s str
 	buf.Grow(len(bestCfNodeList) * 30) // 预估每个节点约30字节
 
 	// 写入头部信息
-	buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
-	if f.Clash {
-		buf.WriteString("proxies:\n")
+	if !f.V2rayn {
+		buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
+		if f.Clash {
+			buf.WriteString("proxies:\n")
+		}
 	}
 
 	// 复制代理信息以避免并发问题
@@ -536,17 +552,20 @@ func SubNiceCfProxyIp(format string, distNodeCountry string, isIPV6 bool) (s str
 
 	// 使用函数映射来简化URL生成逻辑
 	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, int){
-		"surge_vmess":  genSurgeVmessUrl,
-		"surge_trojan": genSurgeTrojanUrl,
-		"clash_vmess":  genClashVmessUrl,
-		"clash_trojan": genClashTrojanUrl,
-		"clash_vless":  genClashVlessUrl,
-		"quanx_vmess":  genQuanXVmessUrl,
-		"quanx_trojan": genQuanXTrojanUrl,
-		"quanx_vless":  genQuanXVlessUrl,
-		"loon_vmess":   genLoonVmessUrl,
-		"loon_trojan":  genLoonTrojanUrl,
-		"loon_vless":   genLoonVlessUrl,
+		"surge_vmess":   genSurgeVmessUrl,
+		"surge_trojan":  genSurgeTrojanUrl,
+		"clash_vmess":   genClashVmessUrl,
+		"clash_trojan":  genClashTrojanUrl,
+		"clash_vless":   genClashVlessUrl,
+		"quanx_vmess":   genQuanXVmessUrl,
+		"quanx_trojan":  genQuanXTrojanUrl,
+		"quanx_vless":   genQuanXVlessUrl,
+		"loon_vmess":    genLoonVmessUrl,
+		"loon_trojan":   genLoonTrojanUrl,
+		"loon_vless":    genLoonVlessUrl,
+		"v2rayn_vmess":  genV2raynVmessUrl,
+		"v2rayn_trojan": genV2raynTrojanUrl,
+		"v2rayn_vless":  genV2raynVlessUrl,
 	}
 
 	// 处理每个国家的节点，并应用limit限制
@@ -576,6 +595,12 @@ func SubNiceCfProxyIp(format string, distNodeCountry string, isIPV6 bool) (s str
 			generator = urlGenerators["loon_trojan"]
 		case f.Loon && f.Vless:
 			generator = urlGenerators["loon_vless"]
+		case f.V2rayn && f.Vmess:
+			generator = urlGenerators["v2rayn_vmess"]
+		case f.V2rayn && f.Trojan:
+			generator = urlGenerators["v2rayn_trojan"]
+		case f.V2rayn && f.Vless:
+			generator = urlGenerators["v2rayn_vless"]
 		}
 
 		country := geoIp.GeoIpDB.FindCountryIsoEmoji(distNodeCountry)
@@ -586,6 +611,10 @@ func SubNiceCfProxyIp(format string, distNodeCountry string, isIPV6 bool) (s str
 			}
 			generator(&buf, proxyInfo, distNodeCountry, country, node, 443)
 		}
+	}
+
+	if f.V2rayn {
+		return base64.StdEncoding.EncodeToString([]byte(buf.String())), nil
 	}
 
 	return buf.String(), nil
@@ -678,9 +707,11 @@ func SubNiceCfProxyIpTop20(format string, distNodeCountry string, isConvertIp bo
 	buf.Grow(len(bestCfNodeList) * 30) // 预估每个节点约30字节
 
 	// 写入头部信息
-	buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
-	if f.Clash {
-		buf.WriteString("proxies:\n")
+	if !f.V2rayn {
+		buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
+		if f.Clash {
+			buf.WriteString("proxies:\n")
+		}
 	}
 
 	// 复制代理信息以避免并发问题
@@ -692,17 +723,20 @@ func SubNiceCfProxyIpTop20(format string, distNodeCountry string, isConvertIp bo
 
 	// 使用函数映射来简化URL生成逻辑
 	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, int){
-		"surge_vmess":  genSurgeVmessUrl,
-		"surge_trojan": genSurgeTrojanUrl,
-		"clash_vmess":  genClashVmessUrl,
-		"clash_trojan": genClashTrojanUrl,
-		"clash_vless":  genClashVlessUrl,
-		"quanx_vmess":  genQuanXVmessUrl,
-		"quanx_trojan": genQuanXTrojanUrl,
-		"quanx_vless":  genQuanXVlessUrl,
-		"loon_vmess":   genLoonVmessUrl,
-		"loon_trojan":  genLoonTrojanUrl,
-		"loon_vless":   genLoonVlessUrl,
+		"surge_vmess":   genSurgeVmessUrl,
+		"surge_trojan":  genSurgeTrojanUrl,
+		"clash_vmess":   genClashVmessUrl,
+		"clash_trojan":  genClashTrojanUrl,
+		"clash_vless":   genClashVlessUrl,
+		"quanx_vmess":   genQuanXVmessUrl,
+		"quanx_trojan":  genQuanXTrojanUrl,
+		"quanx_vless":   genQuanXVlessUrl,
+		"loon_vmess":    genLoonVmessUrl,
+		"loon_trojan":   genLoonTrojanUrl,
+		"loon_vless":    genLoonVlessUrl,
+		"v2rayn_vmess":  genV2raynVmessUrl,
+		"v2rayn_trojan": genV2raynTrojanUrl,
+		"v2rayn_vless":  genV2raynVlessUrl,
 	}
 
 	// 处理每个国家的节点，并应用limit限制
@@ -732,6 +766,12 @@ func SubNiceCfProxyIpTop20(format string, distNodeCountry string, isConvertIp bo
 			generator = urlGenerators["loon_trojan"]
 		case f.Loon && f.Vless:
 			generator = urlGenerators["loon_vless"]
+		case f.V2rayn && f.Vmess:
+			generator = urlGenerators["v2rayn_vmess"]
+		case f.V2rayn && f.Trojan:
+			generator = urlGenerators["v2rayn_trojan"]
+		case f.V2rayn && f.Vless:
+			generator = urlGenerators["v2rayn_vless"]
 		}
 
 		country := geoIp.GeoIpDB.FindCountryIsoEmoji(distNodeCountry)
@@ -742,6 +782,10 @@ func SubNiceCfProxyIpTop20(format string, distNodeCountry string, isConvertIp bo
 			}
 			generator(&buf, proxyInfo, distNodeCountry, country, node, 443)
 		}
+	}
+
+	if f.V2rayn {
+		return base64.StdEncoding.EncodeToString([]byte(buf.String())), nil
 	}
 
 	return buf.String(), nil
@@ -849,9 +893,11 @@ func SubNiceCfProxyIpProvider(format string, isp string, distNodeCountry string,
 	buf.Grow(len(bestCfNodeList) * 30) // 预估每个节点约30字节
 
 	// 写入头部信息
-	buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
-	if f.Clash {
-		buf.WriteString("proxies:\n")
+	if !f.V2rayn {
+		buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
+		if f.Clash {
+			buf.WriteString("proxies:\n")
+		}
 	}
 
 	// 复制代理信息以避免并发问题
@@ -863,17 +909,20 @@ func SubNiceCfProxyIpProvider(format string, isp string, distNodeCountry string,
 
 	// 使用函数映射来简化URL生成逻辑
 	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, int){
-		"surge_vmess":  genSurgeVmessUrl,
-		"surge_trojan": genSurgeTrojanUrl,
-		"clash_vmess":  genClashVmessUrl,
-		"clash_trojan": genClashTrojanUrl,
-		"clash_vless":  genClashVlessUrl,
-		"quanx_vmess":  genQuanXVmessUrl,
-		"quanx_trojan": genQuanXTrojanUrl,
-		"quanx_vless":  genQuanXVlessUrl,
-		"loon_vmess":   genLoonVmessUrl,
-		"loon_trojan":  genLoonTrojanUrl,
-		"loon_vless":   genLoonVlessUrl,
+		"surge_vmess":   genSurgeVmessUrl,
+		"surge_trojan":  genSurgeTrojanUrl,
+		"clash_vmess":   genClashVmessUrl,
+		"clash_trojan":  genClashTrojanUrl,
+		"clash_vless":   genClashVlessUrl,
+		"quanx_vmess":   genQuanXVmessUrl,
+		"quanx_trojan":  genQuanXTrojanUrl,
+		"quanx_vless":   genQuanXVlessUrl,
+		"loon_vmess":    genLoonVmessUrl,
+		"loon_trojan":   genLoonTrojanUrl,
+		"loon_vless":    genLoonVlessUrl,
+		"v2rayn_vmess":  genV2raynVmessUrl,
+		"v2rayn_trojan": genV2raynTrojanUrl,
+		"v2rayn_vless":  genV2raynVlessUrl,
 	}
 
 	// 处理每个国家的节点，并应用limit限制
@@ -903,6 +952,12 @@ func SubNiceCfProxyIpProvider(format string, isp string, distNodeCountry string,
 			generator = urlGenerators["loon_trojan"]
 		case f.Loon && f.Vless:
 			generator = urlGenerators["loon_vless"]
+		case f.V2rayn && f.Vmess:
+			generator = urlGenerators["v2rayn_vmess"]
+		case f.V2rayn && f.Trojan:
+			generator = urlGenerators["v2rayn_trojan"]
+		case f.V2rayn && f.Vless:
+			generator = urlGenerators["v2rayn_vless"]
 		}
 
 		country := geoIp.GeoIpDB.FindCountryIsoEmoji(distNodeCountry)
@@ -915,6 +970,9 @@ func SubNiceCfProxyIpProvider(format string, isp string, distNodeCountry string,
 		}
 	}
 
+	if f.V2rayn {
+		return base64.StdEncoding.EncodeToString([]byte(buf.String())), nil
+	}
 	return buf.String(), nil
 }
 
@@ -1061,9 +1119,11 @@ func SubNiceCfProxySub(format string, sub string, distNodeCountry string, isIPV6
 	buf.Grow(len(bestCfNodeList) * 30) // 预估每个节点约30字节
 
 	// 写入头部信息
-	buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
-	if f.Clash {
-		buf.WriteString("proxies:\n")
+	if !f.V2rayn {
+		buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
+		if f.Clash {
+			buf.WriteString("proxies:\n")
+		}
 	}
 
 	// 复制代理信息以避免并发问题
@@ -1075,17 +1135,20 @@ func SubNiceCfProxySub(format string, sub string, distNodeCountry string, isIPV6
 
 	// 使用函数映射来简化URL生成逻辑
 	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, string, int){
-		"surge_vmess":  genSurgeVmessUrl2,
-		"surge_trojan": genSurgeTrojanUrl2,
-		"clash_vmess":  genClashVmessUrl2,
-		"clash_trojan": genClashTrojanUrl2,
-		"clash_vless":  genClashVlessUrl2,
-		"quanx_vmess":  genQuanXVmessUrl2,
-		"quanx_trojan": genQuanXTrojanUrl2,
-		"quanx_vless":  genQuanXVlessUrl2,
-		"loon_vmess":   genLoonVmessUrl2,
-		"loon_trojan":  genLoonTrojanUrl2,
-		"loon_vless":   genLoonVlessUrl2,
+		"surge_vmess":   genSurgeVmessUrl2,
+		"surge_trojan":  genSurgeTrojanUrl2,
+		"clash_vmess":   genClashVmessUrl2,
+		"clash_trojan":  genClashTrojanUrl2,
+		"clash_vless":   genClashVlessUrl2,
+		"quanx_vmess":   genQuanXVmessUrl2,
+		"quanx_trojan":  genQuanXTrojanUrl2,
+		"quanx_vless":   genQuanXVlessUrl2,
+		"loon_vmess":    genLoonVmessUrl2,
+		"loon_trojan":   genLoonTrojanUrl2,
+		"loon_vless":    genLoonVlessUrl2,
+		"v2rayn_vmess":  genV2raynVmessUrl2,
+		"v2rayn_trojan": genV2raynTrojanUrl2,
+		"v2rayn_vless":  genV2raynVlessUrl2,
 	}
 
 	// 处理每个国家的节点，并应用limit限制
@@ -1115,6 +1178,12 @@ func SubNiceCfProxySub(format string, sub string, distNodeCountry string, isIPV6
 			generator = urlGenerators["loon_trojan"]
 		case f.Loon && f.Vless:
 			generator = urlGenerators["loon_vless"]
+		case f.V2rayn && f.Vmess:
+			generator = urlGenerators["v2rayn_vmess"]
+		case f.V2rayn && f.Trojan:
+			generator = urlGenerators["v2rayn_trojan"]
+		case f.V2rayn && f.Vless:
+			generator = urlGenerators["v2rayn_vless"]
 		}
 
 		country := geoIp.GeoIpDB.FindCountryIsoEmoji(distNodeCountry)
@@ -1138,6 +1207,9 @@ func SubNiceCfProxySub(format string, sub string, distNodeCountry string, isIPV6
 		}
 	}
 
+	if f.V2rayn {
+		return base64.StdEncoding.EncodeToString([]byte(buf.String())), nil
+	}
 	return buf.String(), nil
 }
 
@@ -1163,6 +1235,8 @@ func checkFormat(format string, distNodeCountry string) (f Format, err error) {
 		f.QuanX = true
 	} else if strings.Contains(format, "loon") {
 		f.Loon = true
+	} else if strings.Contains(format, "v2rayn") {
+		f.V2rayn = true
 	} else {
 		return f, fmt.Errorf("invaild client format")
 	}
@@ -1488,4 +1562,120 @@ func Unique[T comparable](s []T) []T {
 		}
 	}
 	return result
+}
+
+func genV2raynVmessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
+	v := make(map[string]interface{})
+	v["v"] = "2"
+	v["ps"] = fmt.Sprintf("%s %s:%d", country, ip, port)
+	v["add"] = ip
+	v["port"] = port
+	v["id"] = proxyInfo[nodeCountry]["vmess"]["uuid"]
+	v["aid"] = "0"
+	v["net"] = "ws"
+	v["type"] = "none"
+	v["host"] = proxyInfo[nodeCountry]["vmess"]["host"]
+	v["path"] = proxyInfo[nodeCountry]["vmess"]["path"]
+	v["tls"] = "tls"
+	v["sni"] = proxyInfo[nodeCountry]["vmess"]["host"]
+	v["fp"] = "chrome"
+
+	jsonStr, _ := json.Marshal(v)
+	buf.WriteString("vmess://" + base64.StdEncoding.EncodeToString(jsonStr) + "\n")
+}
+
+func genV2raynVmessUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	v := make(map[string]interface{})
+	v["v"] = "2"
+	v["ps"] = fmt.Sprintf("%s %s", country, nodeName)
+	v["add"] = ip
+	v["port"] = port
+	v["id"] = proxyInfo[nodeCountry]["vmess"]["uuid"]
+	v["aid"] = "0"
+	v["net"] = "ws"
+	v["type"] = "none"
+	v["host"] = proxyInfo[nodeCountry]["vmess"]["host"]
+	v["path"] = proxyInfo[nodeCountry]["vmess"]["path"]
+	v["tls"] = "tls"
+	v["sni"] = proxyInfo[nodeCountry]["vmess"]["host"]
+	v["fp"] = "chrome"
+
+	jsonStr, _ := json.Marshal(v)
+	buf.WriteString("vmess://" + base64.StdEncoding.EncodeToString(jsonStr) + "\n")
+}
+
+func genV2raynTrojanUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
+	// trojan://password@host:port?security=tls&type=ws&path=/path&host=host#name
+	u := url.URL{
+		Scheme:   "trojan",
+		User:     url.User(proxyInfo[nodeCountry]["trojan"]["password"].(string)),
+		Host:     fmt.Sprintf("%s:%d", ip, port),
+		Fragment: fmt.Sprintf("%s %s:%d", country, ip, port),
+	}
+	q := u.Query()
+	q.Set("security", "tls")
+	q.Set("type", "ws")
+	q.Set("path", proxyInfo[nodeCountry]["trojan"]["path"].(string))
+	q.Set("host", proxyInfo[nodeCountry]["trojan"]["host"].(string))
+	q.Set("sni", proxyInfo[nodeCountry]["trojan"]["host"].(string))
+	q.Set("fp", "chrome")
+	u.RawQuery = q.Encode()
+	buf.WriteString(u.String() + "\n")
+}
+
+func genV2raynTrojanUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	u := url.URL{
+		Scheme:   "trojan",
+		User:     url.User(proxyInfo[nodeCountry]["trojan"]["password"].(string)),
+		Host:     fmt.Sprintf("%s:%d", ip, port),
+		Fragment: fmt.Sprintf("%s %s", country, nodeName),
+	}
+	q := u.Query()
+	q.Set("security", "tls")
+	q.Set("type", "ws")
+	q.Set("path", proxyInfo[nodeCountry]["trojan"]["path"].(string))
+	q.Set("host", proxyInfo[nodeCountry]["trojan"]["host"].(string))
+	q.Set("sni", proxyInfo[nodeCountry]["trojan"]["host"].(string))
+	q.Set("fp", "chrome")
+	u.RawQuery = q.Encode()
+	buf.WriteString(u.String() + "\n")
+}
+
+func genV2raynVlessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
+	// vless://uuid@host:port?encryption=none&security=tls&type=ws&path=/path&host=host&sni=host#name
+	u := url.URL{
+		Scheme:   "vless",
+		User:     url.User(proxyInfo[nodeCountry]["vless"]["uuid"].(string)),
+		Host:     fmt.Sprintf("%s:%d", ip, port),
+		Fragment: fmt.Sprintf("%s %s:%d", country, ip, port),
+	}
+	q := u.Query()
+	q.Set("encryption", "none")
+	q.Set("security", "tls")
+	q.Set("type", "ws")
+	q.Set("path", proxyInfo[nodeCountry]["vless"]["path"].(string))
+	q.Set("host", proxyInfo[nodeCountry]["vless"]["host"].(string))
+	q.Set("sni", proxyInfo[nodeCountry]["vless"]["host"].(string))
+	q.Set("fp", "chrome")
+	u.RawQuery = q.Encode()
+	buf.WriteString(u.String() + "\n")
+}
+
+func genV2raynVlessUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	u := url.URL{
+		Scheme:   "vless",
+		User:     url.User(proxyInfo[nodeCountry]["vless"]["uuid"].(string)),
+		Host:     fmt.Sprintf("%s:%d", ip, port),
+		Fragment: fmt.Sprintf("%s %s", country, nodeName),
+	}
+	q := u.Query()
+	q.Set("encryption", "none")
+	q.Set("security", "tls")
+	q.Set("type", "ws")
+	q.Set("path", proxyInfo[nodeCountry]["vless"]["path"].(string))
+	q.Set("host", proxyInfo[nodeCountry]["vless"]["host"].(string))
+	q.Set("sni", proxyInfo[nodeCountry]["vless"]["host"].(string))
+	q.Set("fp", "chrome")
+	u.RawQuery = q.Encode()
+	buf.WriteString(u.String() + "\n")
 }
