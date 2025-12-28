@@ -1,0 +1,40 @@
+# 运行阶段
+FROM alpine:3.21
+
+# 接收构建参数 (由 buildx 自动注入)
+ARG TARGETOS
+ARG TARGETARCH
+
+# 安装运行时依赖并清理缓存
+RUN apk add --no-cache ca-certificates tzdata \
+    && rm -rf /var/cache/apk/*
+
+# 创建文件夹
+RUN mkdir -p /app/config
+
+WORKDIR /app
+
+# 复制配置文件
+COPY ./config/config.yaml ./config/source.yaml /app/config/
+
+# 复制预编译的二进制文件
+# 注意：构建上下文中必须包含 bin/ 目录，且文件名格式必须为 proxypool-<os>-<arch>
+# 例如：bin/proxypool-linux-amd64, bin/proxypool-linux-arm64
+COPY bin/proxypool-${TARGETOS}-${TARGETARCH} /app/proxypool
+
+# 设置权限
+RUN chmod +x /app/proxypool
+
+# 设置时区
+ENV TZ=Asia/Shanghai
+
+# 暴露端口
+EXPOSE 12580
+
+# 启动命令
+ENTRYPOINT ["/app/proxypool"]
+CMD ["-d", "-c", "config/config.yaml"]
+
+# 添加元数据标签
+LABEL maintainer="proxypool@laibas.top" \
+      description="ProxyPool Service"
