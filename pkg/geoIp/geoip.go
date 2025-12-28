@@ -66,6 +66,12 @@ type CountryEmoji struct {
 	Emoji string `json:"emoji"`
 }
 
+type IPAPIResponse struct {
+	CountryCode string `json:"countryCode"`
+	Status      string `json:"status"`
+	Message     string `json:"message"`
+}
+
 // new geoip from db file
 func NewGeoIP(geodb, flags string) (geoip GeoIP) {
 	// 运行到这里时geodb只能为存在
@@ -237,9 +243,47 @@ func (g GeoIP) Find(ipORdomain string) (ip, country string, err error) {
 	if found {
 		country = fmt.Sprintf("%v %v", emoji, countryIsoCode)
 	} else {
+		// Fallback to ip-api.com
+		countryCode, err2 := FindFromIPAPI(ips[0].String())
+		if err2 == nil && countryCode != "" {
+			countryIsoCode = countryCode
+			emoji, found = g.emojiMap[countryIsoCode]
+			if found {
+				country = fmt.Sprintf("%v %v", emoji, countryIsoCode)
+				log.Infoln("Fallback to ip-api.com success: %s -> %s", ips[0].String(), country)
+				return
+			}
+		}
 		country = "🏁 ZZ"
 	}
 	return
+}
+
+func FindFromIPAPI(ip string) (countryCode string, err error) {
+	resp, err := http.Get(fmt.Sprintf("http://ip-api.com/json/%s?fields=status,countryCode,message", ip))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("ip-api.com status: %d", resp.StatusCode)
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var data IPAPIResponse
+	if err := json.Unmarshal(body, &data); err != nil {
+		return "", err
+	}
+
+	if data.Status == "success" {
+		return data.CountryCode, nil
+	}
+	return "", fmt.Errorf("ip-api.com query failed: %s", data.Message)
 }
 
 func (g GeoIP) FindCountryIsoEmoji(countryIsoCode string) string {
