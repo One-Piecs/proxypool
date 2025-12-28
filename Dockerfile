@@ -21,7 +21,7 @@ RUN apk add --no-cache ca-certificates tzdata \
     && rm -rf /var/cache/apk/*
 
 # 创建文件夹
-RUN mkdir -p /app/config
+RUN mkdir -p /app/config /app/data
 
 WORKDIR /app
 
@@ -44,4 +44,4 @@ CMD ["-d", "-c", "config/config.yaml"]
 
 # 添加元数据标签（可选）
 LABEL maintainer="proxypool@laibas.top" \
-      description="ProxyPool Service"
+    description="ProxyPool Service"
