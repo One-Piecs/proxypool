@@ -1606,10 +1606,14 @@ func genV2raynVmessUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCo
 
 func genV2raynTrojanUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
 	// trojan://password@host:port?security=tls&type=ws&path=/path&host=host#name
+	host := ip
+	if IsIPv6(ip) {
+		host = fmt.Sprintf("[%s]", ip)
+	}
 	u := url.URL{
 		Scheme:   "trojan",
 		User:     url.User(proxyInfo[nodeCountry]["trojan"]["password"].(string)),
-		Host:     fmt.Sprintf("%s:%d", ip, port),
+		Host:     fmt.Sprintf("%s:%d", host, port),
 		Fragment: fmt.Sprintf("%s %s:%d", country, ip, port),
 	}
 	q := u.Query()
@@ -1624,10 +1628,14 @@ func genV2raynTrojanUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCo
 }
 
 func genV2raynTrojanUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	host := ip
+	if IsIPv6(ip) {
+		host = fmt.Sprintf("[%s]", ip)
+	}
 	u := url.URL{
 		Scheme:   "trojan",
 		User:     url.User(proxyInfo[nodeCountry]["trojan"]["password"].(string)),
-		Host:     fmt.Sprintf("%s:%d", ip, port),
+		Host:     fmt.Sprintf("%s:%d", host, port),
 		Fragment: fmt.Sprintf("%s %s", country, nodeName),
 	}
 	q := u.Query()
@@ -1643,10 +1651,14 @@ func genV2raynTrojanUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeC
 
 func genV2raynVlessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, ip string, port int) {
 	// vless://uuid@host:port?encryption=none&security=tls&type=ws&path=/path&host=host&sni=host#name
+	host := ip
+	if IsIPv6(ip) {
+		host = fmt.Sprintf("[%s]", ip)
+	}
 	u := url.URL{
 		Scheme:   "vless",
 		User:     url.User(proxyInfo[nodeCountry]["vless"]["uuid"].(string)),
-		Host:     fmt.Sprintf("%s:%d", ip, port),
+		Host:     fmt.Sprintf("%s:%d", host, port),
 		Fragment: fmt.Sprintf("%s %s:%d", country, ip, port),
 	}
 	q := u.Query()
@@ -1662,10 +1674,14 @@ func genV2raynVlessUrl(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCou
 }
 
 func genV2raynVlessUrl2(buf *strings.Builder, proxyInfo config.ProxyInfo, nodeCountry, country, nodeName string, ip string, port int) {
+	host := ip
+	if IsIPv6(ip) {
+		host = fmt.Sprintf("[%s]", ip)
+	}
 	u := url.URL{
 		Scheme:   "vless",
 		User:     url.User(proxyInfo[nodeCountry]["vless"]["uuid"].(string)),
-		Host:     fmt.Sprintf("%s:%d", ip, port),
+		Host:     fmt.Sprintf("%s:%d", host, port),
 		Fragment: fmt.Sprintf("%s %s", country, nodeName),
 	}
 	q := u.Query()

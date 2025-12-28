@@ -89,7 +89,7 @@ func (ss Shadowsocks) Clone() Proxy {
 // https://shadowsocks.org/en/config/quick-guide.html
 // Link converts a ss proxy to string
 func (ss Shadowsocks) Link() (link string) {
-	payload := fmt.Sprintf("%s:%s@%s:%d", ss.Cipher, ss.Password, ss.Server, ss.Port)
+	payload := fmt.Sprintf("%s:%s@%s", ss.Cipher, ss.Password, net.JoinHostPort(ss.Server, strconv.Itoa(ss.Port)))
 	payload = tool.Base64EncodeString(payload, false)
 	return fmt.Sprintf("ss://%s#%s", payload, ss.Name)
 }
