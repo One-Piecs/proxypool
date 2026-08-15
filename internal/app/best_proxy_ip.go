@@ -67,14 +67,15 @@ func CrawlBestNode() {
 						Get(_url)
 					if err != nil {
 						log.Errorln("resty.Get(): %s, retry: %d", err.Error(), retries)
-						time.Sleep(time.Second * time.Duration(retries+1))
+						// 指数退避：超时后等服务恢复，避免立即重试再超时
+						time.Sleep(time.Duration(retries+1) * 2 * time.Second)
 						continue
 					}
 
 					de64, err := base64.StdEncoding.DecodeString(resp.String())
 					if err != nil {
 						log.Errorln("url[%s] base64 decode error: %s", _url, err.Error())
-						time.Sleep(time.Second * time.Duration(retries+1))
+						time.Sleep(time.Duration(retries+1) * 2 * time.Second)
 						continue
 					}
 

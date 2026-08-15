@@ -5,6 +5,15 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.25] - 2026-08-16
+
+### 🐛 修复订阅源抓取超时
+
+- `CrawlBestNode` 订阅源请求超时 30s → **60s**：v1.1.24 引入共享 resty 客户端时
+  设置 30s 超时（原实现无超时会无限挂起），但部分海外订阅源响应较慢，
+  30s 偏紧导致 `context deadline exceeded`；60s 在防挂死与容错间取得平衡
+- 重试退避 1s/2s → **2s/4s**：超时后给慢源更多恢复时间，避免立即重试再次超时
+
 ## [v1.1.24] - 2026-08-16
 
 ### ⚡ internal/app 优化

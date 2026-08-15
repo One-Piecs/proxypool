@@ -18,9 +18,11 @@ import (
 
 // bestNodeClient 共享的 resty 客户端：跳过 TLS 校验、统一 UA 与超时。
 // resty.Client 并发安全，原先每个请求都 resty.New() 创建新客户端。
+// 超时取 60s：订阅源常为海外慢站，原实现无超时（慢源会无限挂起），
+// 30s 对部分源偏紧，60s 在防挂死与容错间取得平衡。
 var bestNodeClient = resty.New().
 	SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true}).
-	SetTimeout(30*time.Second).
+	SetTimeout(60*time.Second).
 	SetHeader("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 
 // generatorKey 返回 Format 对应的 URL 生成器键名（未匹配返回空串）。
