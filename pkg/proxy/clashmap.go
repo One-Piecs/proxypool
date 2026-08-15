@@ -106,7 +106,8 @@ func ToClashMap(p Proxy) map[string]interface{} {
 		if pp.SkipCertVerify {
 			m["skip-cert-verify"] = pp.SkipCertVerify
 		}
-		if network == "ws" {
+		switch network {
+		case "ws":
 			wsOpts := map[string]interface{}{"path": "/"}
 			if pp.WSPath != "" {
 				wsOpts["path"] = pp.WSPath
@@ -119,6 +120,18 @@ func ToClashMap(p Proxy) map[string]interface{} {
 				wsOpts["headers"] = map[string]string{"Host": host}
 			}
 			m["ws-opts"] = wsOpts
+		case "grpc":
+			if pp.GrpcServiceName != "" {
+				m["grpc-opts"] = map[string]interface{}{"grpc-service-name": pp.GrpcServiceName}
+			}
+		}
+		// Reality 参数
+		if pp.RealityPublicKey != "" {
+			realityOpts := map[string]interface{}{"public-key": pp.RealityPublicKey}
+			if pp.RealityShortID != "" {
+				realityOpts["short-id"] = pp.RealityShortID
+			}
+			m["reality-opts"] = realityOpts
 		}
 		return m
 	}

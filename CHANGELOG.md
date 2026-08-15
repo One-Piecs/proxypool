@@ -340,6 +340,19 @@
 - 移除已替换依赖在 `go.mod` / `go.sum` 中的条目
 - 变更规模：28 个文件，+701 / -1270 行（净减约 570 行）
 
+## [v1.1.38] - 2026-08-16
+
+### 🚀 补全 vless Reality 与 grpc 传输支持
+
+- **Reality**：解析 `security=reality` 的 `pbk`(public-key) / `sid`(short-id) /
+  `spiderX` 参数；`Link()` 生成时 security 标记为 reality 并带回参数；
+  Clash 输出 / mihomo 映射输出 `reality-opts:{public-key, short-id}`
+- **grpc 传输**：解析 `type=grpc` 的 `serviceName`(兼容 `service_name`)；
+  Clash 输出 / mihomo 映射输出 `grpc-opts:{grpc-service-name}`；
+  Loon / QuanX 输出 grpc-service-name
+- 新增测试：reality 解析/生成往返、grpc 解析/生成往返、
+  mihomo 解析 4 种变体（ws+tls / tcp / reality+flow / grpc+tls，reality 公钥运行时生成保证合法）
+
 ## [v1.1.37] - 2026-08-16
 
 ### 🐛 Surge 不支持 vless，撤销 surge 输出

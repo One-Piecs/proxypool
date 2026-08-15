@@ -15,6 +15,13 @@ import (
 var ErrorNotVlessLink = errors.New("not a correct vless link")
 
 // Vless 是 vless 协议代理
+//
+// 支持形式：
+//   - 传输：tcp / ws / grpc
+//   - 安全：tls / reality（pbk + sid）
+//   - flow：xtls-rprx-vision 等
+//   - 输出：Clash / Loon / QuanX / vless:// 链接
+//   - 健康检查/测速（mihomo 解析）
 type Vless struct {
 	Base
 	UUID           string `yaml:"uuid" json:"uuid"`
@@ -28,6 +35,12 @@ type Vless struct {
 	TLS            bool   `yaml:"tls,omitempty" json:"tls,omitempty"`
 	SkipCertVerify bool   `yaml:"skip-cert-verify,omitempty" json:"skip-cert-verify,omitempty"`
 	UDP            bool   `yaml:"udp,omitempty" json:"udp,omitempty"`
+	// Reality 参数（security=reality）
+	RealityPublicKey string `yaml:"reality-public-key,omitempty" json:"reality-public-key,omitempty"`
+	RealityShortID   string `yaml:"reality-short-id,omitempty" json:"reality-short-id,omitempty"`
+	SpiderX          string `yaml:"spiderx,omitempty" json:"spiderx,omitempty"` // 客户端本地行为，仅用于链接往返
+	// grpc 传输参数（type=grpc）
+	GrpcServiceName string `yaml:"grpc-service-name,omitempty" json:"grpc-service-name,omitempty"`
 }
 
 func (v Vless) Identifier() string {
@@ -50,12 +63,21 @@ func (v Vless) ToQuanX() string {
 	}
 	text := fmt.Sprintf(`vless = %s:%d, method=none, password=%s, udp-relay=true, tag=%s`,
 		v.Server, v.Port, v.UUID, v.Name)
-	if v.Network == "ws" {
+	network := v.Network
+	if network == "" {
+		network = "tcp"
+	}
+	switch network {
+	case "ws":
 		path := v.WSPath
 		if path == "" {
 			path = "/"
 		}
 		text += fmt.Sprintf(", obfs=wss, obfs-uri=%s, obfs-host=%s", path, host)
+	case "grpc":
+		if v.GrpcServiceName != "" {
+			text += ", grpc-service-name=" + v.GrpcServiceName
+		}
 	}
 	if v.TLS {
 		if host == "" {
@@ -128,7 +150,8 @@ func (v Vless) ToClash() string {
 		network = "tcp"
 	}
 	m["network"] = network
-	if network == "ws" {
+	switch network {
+	case "ws":
 		wsOpts := map[string]interface{}{"path": "/"}
 		if v.WSPath != "" {
 			wsOpts["path"] = v.WSPath
@@ -141,6 +164,19 @@ func (v Vless) ToClash() string {
 			wsOpts["headers"] = map[string]string{"Host": host}
 		}
 		m["ws-opts"] = wsOpts
+	case "grpc":
+		if v.GrpcServiceName != "" {
+			m["grpc-opts"] = map[string]interface{}{"grpc-service-name": v.GrpcServiceName}
+		}
+	}
+
+	// Reality 参数
+	if v.RealityPublicKey != "" {
+		realityOpts := map[string]interface{}{"public-key": v.RealityPublicKey}
+		if v.RealityShortID != "" {
+			realityOpts["short-id"] = v.RealityShortID
+		}
+		m["reality-opts"] = realityOpts
 	}
 
 	data, err := json.Marshal(m)
@@ -180,8 +216,18 @@ func (v Vless) ToLoon() string {
 	if network == "" {
 		network = "tcp"
 	}
-	text := fmt.Sprintf(`%s = vless, %s, %d, "%s", transport:%s, path:%s, over-tls:%v`,
-		v.Name, v.Server, v.Port, v.UUID, network, v.WSPath, v.TLS)
+	text := fmt.Sprintf(`%s = vless, %s, %d, "%s", transport:%s, over-tls:%v`,
+		v.Name, v.Server, v.Port, v.UUID, network, v.TLS)
+	if network == "ws" {
+		path := v.WSPath
+		if path == "" {
+			path = "/"
+		}
+		text += fmt.Sprintf(", path:%s", path)
+	}
+	if network == "grpc" && v.GrpcServiceName != "" {
+		text += ", grpc-service-name:" + v.GrpcServiceName
+	}
 	if v.TLS {
 		if v.ServerName != "" {
 			text += ", tls-name:" + v.ServerName
@@ -213,7 +259,11 @@ func (v Vless) Link() (link string) {
 	}
 	q.Set("encryption", encryption)
 	if v.TLS {
-		q.Set("security", "tls")
+		if v.RealityPublicKey != "" {
+			q.Set("security", "reality")
+		} else {
+			q.Set("security", "tls")
+		}
 	}
 	network := v.Network
 	if network == "" {
@@ -234,6 +284,20 @@ func (v Vless) Link() (link string) {
 	}
 	if v.Fingerprint != "" {
 		q.Set("fp", v.Fingerprint)
+	}
+	// Reality 参数
+	if v.RealityPublicKey != "" {
+		q.Set("pbk", v.RealityPublicKey)
+	}
+	if v.RealityShortID != "" {
+		q.Set("sid", v.RealityShortID)
+	}
+	if v.SpiderX != "" {
+		q.Set("spiderX", v.SpiderX)
+	}
+	// grpc 传输
+	if network == "grpc" && v.GrpcServiceName != "" {
+		q.Set("serviceName", v.GrpcServiceName)
 	}
 	u.RawQuery = q.Encode()
 	return u.String()
@@ -271,7 +335,7 @@ func ParseVlessLink(link string) (*Vless, error) {
 
 	// 安全层
 	switch q.Get("security") {
-	case "tls", "reality":
+	case "tls":
 		v.TLS = true
 		v.ServerName = q.Get("sni")
 		if v.ServerName == "" {
@@ -281,11 +345,31 @@ func ParseVlessLink(link string) (*Vless, error) {
 		if v.Fingerprint == "" {
 			v.Fingerprint = q.Get("fingerprint")
 		}
+	case "reality":
+		v.TLS = true
+		v.ServerName = q.Get("sni")
+		if v.ServerName == "" {
+			v.ServerName = q.Get("peer")
+		}
+		v.Fingerprint = q.Get("fp")
+		if v.Fingerprint == "" {
+			v.Fingerprint = q.Get("fingerprint")
+		}
+		// Reality 参数：pbk(public-key) / sid(short-id) / spiderX(客户端行为)
+		v.RealityPublicKey = q.Get("pbk")
+		if v.RealityPublicKey == "" {
+			v.RealityPublicKey = q.Get("publicKey")
+		}
+		v.RealityShortID = q.Get("sid")
+		v.SpiderX = q.Get("spiderX")
+		if v.SpiderX == "" {
+			v.SpiderX = q.Get("spiderx")
+		}
 	}
 
 	v.Flow = q.Get("flow")
 
-	// 传输层（支持 tcp/ws，grpc/h2 等保留基础字段）
+	// 传输层（tcp / ws / grpc）
 	v.Network = q.Get("type")
 	if v.Network == "" {
 		v.Network = "tcp"
@@ -294,6 +378,11 @@ func ParseVlessLink(link string) (*Vless, error) {
 	case "ws":
 		v.WSPath = q.Get("path")
 		v.Host = q.Get("host")
+	case "grpc":
+		v.GrpcServiceName = q.Get("serviceName")
+		if v.GrpcServiceName == "" {
+			v.GrpcServiceName = q.Get("service_name")
+		}
 	}
 
 	if q.Get("allowInsecure") == "1" || q.Get("allowInsecure") == "true" {

@@ -149,3 +149,61 @@ func TestToQuanX(t *testing.T) {
 		}
 	}
 }
+
+// TestVlessReality 验证 reality 节点参数(pbk/sid/spiderX)解析与生成往返
+func TestVlessReality(t *testing.T) {
+	link := "vless://44444444-4444-4444-4444-444444444444@1.2.3.4:443?encryption=none&security=reality&pbk=REALITY_PUBLIC_KEY_ABC&sid=abcdef12&spiderX=%2F&flow=xtls-rprx-vision&sni=www.apple.com&fp=chrome&type=tcp#reality-node"
+	v, err := ParseVlessLink(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !v.TLS {
+		t.Error("reality node should set TLS")
+	}
+	if v.RealityPublicKey != "REALITY_PUBLIC_KEY_ABC" {
+		t.Errorf("pbk = %q", v.RealityPublicKey)
+	}
+	if v.RealityShortID != "abcdef12" {
+		t.Errorf("sid = %q", v.RealityShortID)
+	}
+	if v.SpiderX != "/" {
+		t.Errorf("spiderX = %q", v.SpiderX)
+	}
+	if v.ServerName != "www.apple.com" || v.Flow != "xtls-rprx-vision" {
+		t.Errorf("sni=%q flow=%q", v.ServerName, v.Flow)
+	}
+
+	// 生成往返
+	regen := v.Link()
+	v2, err := ParseVlessLink(regen)
+	if err != nil {
+		t.Fatalf("re-parse failed: %v (%s)", err, regen)
+	}
+	if v2.RealityPublicKey != v.RealityPublicKey || v2.RealityShortID != v.RealityShortID || v2.SpiderX != v.SpiderX {
+		t.Errorf("reality round-trip mismatch: %+v vs %+v", v2, v)
+	}
+}
+
+// TestVlessGrpc 验证 grpc 传输参数(serviceName)解析与生成往返
+func TestVlessGrpc(t *testing.T) {
+	link := "vless://55555555-5555-5555-5555-555555555555@example.com:443?encryption=none&security=tls&sni=example.com&type=grpc&serviceName=grpcsvc&fp=chrome#grpc-node"
+	v, err := ParseVlessLink(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Network != "grpc" {
+		t.Errorf("network = %q, want grpc", v.Network)
+	}
+	if v.GrpcServiceName != "grpcsvc" {
+		t.Errorf("grpc-service-name = %q, want grpcsvc", v.GrpcServiceName)
+	}
+
+	regen := v.Link()
+	v2, err := ParseVlessLink(regen)
+	if err != nil {
+		t.Fatalf("re-parse failed: %v (%s)", err, regen)
+	}
+	if v2.Network != "grpc" || v2.GrpcServiceName != "grpcsvc" {
+		t.Errorf("grpc round-trip mismatch: %+v", v2)
+	}
+}
