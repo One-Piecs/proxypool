@@ -71,6 +71,7 @@ type Proxy interface {
 	ToClash() string
 	ToSurge() string
 	ToLoon() string
+	ToQuanX() string
 	Link() string
 	Identifier() string
 	SetName(name string)

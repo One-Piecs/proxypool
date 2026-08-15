@@ -80,6 +80,16 @@ func (t Trojan) ToLoon() string {
 		t.Name, t.Server, t.Port, t.Password, t.Server, t.SkipCertVerify)
 }
 
+// ToQuanX converts proxy to quanx string
+func (t Trojan) ToQuanX() string {
+	sni := t.SNI
+	if sni == "" {
+		sni = t.Server
+	}
+	return fmt.Sprintf(`trojan = %s:%d, password=%s, udp-relay=true, over-tls=true, tls-host=%s, tls-verification=%v, tag=%s`,
+		t.Server, t.Port, t.Password, sni, !t.SkipCertVerify, t.Name)
+}
+
 func (t Trojan) Clone() Proxy {
 	return &t
 }

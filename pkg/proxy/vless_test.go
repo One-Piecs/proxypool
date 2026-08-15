@@ -115,3 +115,29 @@ func TestVlessClashConfigUnmarshal(t *testing.T) {
 		t.Errorf("Host = %q, want cdn.example.com", v.Host)
 	}
 }
+
+// TestToQuanX 验证各类型 ToQuanX 输出包含节点名与协议关键字
+func TestToQuanX(t *testing.T) {
+	proxies := []Proxy{
+		&Shadowsocks{Base: Base{Name: "ss1", Server: "1.2.3.4", Port: 8388, Type: "ss"}, Password: "p", Cipher: "aes-256-gcm"},
+		&Vmess{Base: Base{Name: "vm1", Server: "example.com", Port: 443, Type: "vmess"}, UUID: "11111111-1111-1111-1111-111111111111", Network: "ws", WSPath: "/v", TLS: true, ServerName: "cdn.example.com"},
+		&Trojan{Base: Base{Name: "tr1", Server: "t.example.com", Port: 443, Type: "trojan"}, Password: "tp", SNI: "t.example.com"},
+		&Vless{Base: Base{Name: "vl1", Server: "v.example.com", Port: 443, Type: "vless"}, UUID: "22222222-2222-2222-2222-222222222222", Network: "ws", WSPath: "/vl", TLS: true, Host: "cdn.example.com"},
+	}
+	for _, p := range proxies {
+		out := p.ToQuanX()
+		if !strings.Contains(out, "tag="+p.BaseInfo().Name) {
+			t.Errorf("%s: ToQuanX missing tag: %s", p.TypeName(), out)
+		}
+		switch p.TypeName() {
+		case "ss":
+			if !strings.HasPrefix(out, "ss = ") { t.Errorf("ss prefix: %s", out) }
+		case "vmess":
+			if !strings.HasPrefix(out, "vmess = ") { t.Errorf("vmess prefix: %s", out) }
+		case "trojan":
+			if !strings.HasPrefix(out, "trojan = ") { t.Errorf("trojan prefix: %s", out) }
+		case "vless":
+			if !strings.HasPrefix(out, "vless = ") { t.Errorf("vless prefix: %s", out) }
+		}
+	}
+}

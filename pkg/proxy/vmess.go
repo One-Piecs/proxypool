@@ -189,6 +189,34 @@ func (v Vmess) ToLoon() string {
 	}
 }
 
+// ToQuanX converts proxy to quanx string
+func (v Vmess) ToQuanX() string {
+	cipher := v.Cipher
+	if cipher == "auto" || cipher == "none" {
+		cipher = "chacha20-poly1305"
+	}
+	host := v.WSHeaders["HOST"]
+	if host == "" {
+		host = v.ServerName
+	}
+	text := fmt.Sprintf(`vmess = %s:%d, method=%s, password=%s, aead=true, udp-relay=true, tag=%s`,
+		v.Server, v.Port, cipher, v.UUID, v.Name)
+	if v.Network == "ws" {
+		path := v.WSPath
+		if path == "" {
+			path = "/"
+		}
+		text += fmt.Sprintf(", obfs=wss, obfs-uri=%s, obfs-host=%s", path, host)
+	}
+	if v.TLS {
+		if host == "" {
+			host = v.Server
+		}
+		text += fmt.Sprintf(", tls-host=%s, tls-verification=%v", host, !v.SkipCertVerify)
+	}
+	return text
+}
+
 func (v Vmess) Clone() Proxy {
 	return &v
 }

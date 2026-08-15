@@ -293,6 +293,18 @@ func setupRouter() {
 		})
 	})
 
+	router.GET("/loon", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "loon.html", gin.H{
+			"domain": config.Config().Domain,
+		})
+	})
+
+	router.GET("/quanx", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "quanx.html", gin.H{
+			"domain": config.Config().Domain,
+		})
+	})
+
 	router.GET("/clash/config", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "clash-config.yaml", gin.H{
 			"domain": config.Config().Domain,
@@ -333,6 +345,13 @@ func setupRouter() {
 	router.GET("/v2rayn/proxies", func(c *gin.Context) {
 		text := serveProxyList(c, "v2raynproxies", false, func(proxies proxy.ProxyList, base provider.Base) string {
 			return provider.V2rayn{Base: base}.Provide()
+		})
+		c.String(http.StatusOK, text)
+	})
+
+	router.GET("/quanx/proxies", func(c *gin.Context) {
+		text := serveProxyList(c, "quanxproxies", false, func(proxies proxy.ProxyList, base provider.Base) string {
+			return provider.QuanX{Base: base}.Provide()
 		})
 		c.String(http.StatusOK, text)
 	})

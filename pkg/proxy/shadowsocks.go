@@ -82,6 +82,20 @@ func (ss Shadowsocks) ToLoon() string {
 	}
 }
 
+// ToQuanX converts proxy to quanx string
+func (ss Shadowsocks) ToQuanX() string {
+	text := fmt.Sprintf(`ss = %s:%d, method=%s, password=%s, udp=true, tag=%s`,
+		ss.Server, ss.Port, ss.Cipher, ss.Password, ss.Name)
+	if ss.Plugin == "obfs" && ss.PluginOpts != nil {
+		mode, _ := ss.PluginOpts["mode"].(string)
+		host, _ := ss.PluginOpts["host"].(string)
+		if mode != "" {
+			text += fmt.Sprintf(", obfs=%s, obfs-host=%s", mode, host)
+		}
+	}
+	return text
+}
+
 func (ss Shadowsocks) Clone() Proxy {
 	return &ss
 }

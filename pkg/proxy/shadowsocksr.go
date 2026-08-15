@@ -69,6 +69,12 @@ func (ssr ShadowsocksR) ToLoon() string {
 		ssr.Protocol, ssr.ProtocolParam, ssr.Obfs, ssr.ObfsParam)
 }
 
+// ToQuanX converts proxy to quanx string
+func (ssr ShadowsocksR) ToQuanX() string {
+	return fmt.Sprintf(`ssr = %s:%d, protocol=%s, protocol-param=%s, obfs=%s, obfs-param=%s, method=%s, password=%s, tag=%s`,
+		ssr.Server, ssr.Port, ssr.Protocol, ssr.ProtocolParam, ssr.Obfs, ssr.ObfsParam, ssr.Cipher, ssr.Password, ssr.Name)
+}
+
 func (ssr ShadowsocksR) Clone() Proxy {
 	return &ssr
 }

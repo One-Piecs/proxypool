@@ -5,6 +5,17 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.33] - 2026-08-16
+
+### 🚀 新增 /loon /quanx 页面与 QuanX 输出
+
+- **新增页面**：`/loon`、`/quanx`（与 /clash /surge 同风格，含节点列表订阅入口）
+- **新增 `ToQuanX()`**：ss / ssr / vmess / trojan / vless 五种类型的 QuanX 格式输出
+  （`vmess = host:port, method=..., password=..., obfs=wss, ...`）
+- **新增 QuanX provider**：`/quanx/proxies` 接口（支持现有全部筛选参数）
+- 所有页面导航栏增加 Loon / QuanX 入口（6 个页面同步）
+- 新增 ToQuanX 输出单元测试
+
 ## [v1.1.32] - 2026-08-16
 
 ### 🎨 页面与文档同步 vless

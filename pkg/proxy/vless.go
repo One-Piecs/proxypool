@@ -42,6 +42,30 @@ func (v Vless) String() string {
 	return string(data)
 }
 
+// ToQuanX converts proxy to quanx string
+func (v Vless) ToQuanX() string {
+	host := v.Host
+	if host == "" {
+		host = v.ServerName
+	}
+	text := fmt.Sprintf(`vless = %s:%d, method=none, password=%s, udp-relay=true, tag=%s`,
+		v.Server, v.Port, v.UUID, v.Name)
+	if v.Network == "ws" {
+		path := v.WSPath
+		if path == "" {
+			path = "/"
+		}
+		text += fmt.Sprintf(", obfs=wss, obfs-uri=%s, obfs-host=%s", path, host)
+	}
+	if v.TLS {
+		if host == "" {
+			host = v.Server
+		}
+		text += fmt.Sprintf(", tls-host=%s, tls-verification=%v", host, !v.SkipCertVerify)
+	}
+	return text
+}
+
 func (v Vless) Clone() Proxy {
 	return &v
 }
