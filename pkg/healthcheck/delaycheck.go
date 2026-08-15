@@ -48,19 +48,7 @@ func CleanBadProxiesWithWorkpool(proxies []proxy.Proxy) (cproxies []proxy.Proxy)
 			defer progress.inc()
 			delay, err := testDelay(pp)
 			if err == nil && delay != 0 {
-				statsLock.Lock()
-				var ps *Stat
-				if ps, ok := ProxyStats.Find(pp); ok {
-					ps.UpdatePSDelay(delay)
-				} else {
-					ps = &Stat{
-						Id:    pp.Identifier(),
-						Delay: delay,
-					}
-					ProxyStats = append(ProxyStats, *ps)
-				}
-				statsLock.Unlock()
-				c <- ps
+				c <- findOrCreateDelayStat(pp, delay)
 			}
 		})
 	}
@@ -90,6 +78,27 @@ func CleanBadProxiesWithWorkpool(proxies []proxy.Proxy) (cproxies []proxy.Proxy)
 			return
 		}
 	}
+}
+
+// findOrCreateDelayStat 在锁内查找或创建延迟统计，返回非 nil 的 *Stat。
+// 提取为独立函数以避免变量遮蔽 bug（旧实现把 c <- ps 移到 if 外后，
+// 发送的是被遮蔽的 nil 外层变量，导致接收端 ps.Delay panic）。
+func findOrCreateDelayStat(p proxy.Proxy, delay uint16) *Stat {
+	statsLock.Lock()
+	defer statsLock.Unlock()
+
+	var ps *Stat
+	var ok bool
+	if ps, ok = ProxyStats.Find(p); ok {
+		ps.UpdatePSDelay(delay)
+	} else {
+		ps = &Stat{
+			Id:    p.Identifier(),
+			Delay: delay,
+		}
+		ProxyStats = append(ProxyStats, *ps)
+	}
+	return ps
 }
 
 // Return 0 for error

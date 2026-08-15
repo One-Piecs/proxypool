@@ -5,6 +5,19 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.26] - 2026-08-16
+
+### 🐛 修复健康检查 nil 指针 panic
+
+- **修复 `CleanBadProxiesWithWorkpool` 的变量遮蔽 bug（严重）**：v1.1.22 重写时把
+  `c <- ps` 移到 if/else 外，但 if 语句的 `:=` 声明了遮蔽外层的新 `ps`，
+  两个分支赋值的是内层变量，channel 实际发送的是外层 nil 指针，
+  接收端 `ps.Delay` 触发 `invalid memory address or nil pointer dereference`，
+  首次爬取健康检查阶段即崩溃
+- 修复方式：find-or-create 逻辑提取为 `findOrCreateDelayStat`（锁内查找/创建，
+  保证返回非 nil），worker 发送其返回值
+- 新增回归测试 `TestFindOrCreateDelayStat`：验证首次创建/二次命中更新均返回非 nil
+
 ## [v1.1.25] - 2026-08-16
 
 ### 🐛 修复订阅源抓取超时
