@@ -84,7 +84,9 @@ func GetAllProxies() (proxies proxy.ProxyList) {
 	}
 
 	proxiesDB := make([]Proxy, 0)
-	DB.Select("link").Find(&proxiesDB)
+	// 同时取回 name/country：解析出来的节点默认 name 为空，
+	// 启动加载阶段（首轮爬取完成前）会直接暴露给 /proxies 接口
+	DB.Select("link, name, country").Find(&proxiesDB)
 
 	wp := workerpool.New(100)
 	m := sync.Mutex{}
@@ -96,6 +98,13 @@ func GetAllProxies() (proxies proxy.ProxyList) {
 			p, err := proxy.ParseProxyFromLink(pDB.Link)
 			if err == nil && p != nil {
 				p.SetUseable(false)
+				// 恢复上次爬取时保存的名称与国家（避免启动窗口期 name 为空）
+				if pDB.Name != "" {
+					p.SetName(pDB.Name)
+				}
+				if pDB.Country != "" {
+					p.SetCountry(pDB.Country)
+				}
 				m.Lock()
 				proxies = append(proxies, p)
 				m.Unlock()

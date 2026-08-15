@@ -96,16 +96,13 @@ func ParseProxyFromLink(link string) (p Proxy, err error) {
 	if err != nil || p == nil {
 		return nil, errors.New("link parse failed")
 	}
-	_, country, err := geoIp.GeoIpDB.Find(p.BaseInfo().Server) // IP库不准
-	if err != nil {
+	// GeoIP 查询仅用于补充国家信息，失败时用默认值，不应使解析成功的节点报错
+	_, country, geoErr := geoIp.GeoIpDB.Find(p.BaseInfo().Server) // IP库不准
+	if geoErr != nil {
 		country = "🏁 ZZ"
 	}
 	p.SetCountry(country)
-	// trojan依赖域名？<-这是啥?不管什么情况感觉都不应该替换域名为IP（主要是IP库的质量和节点质量不该挂钩）
-	// if p.TypeName() != "trojan" {
-	//	p.SetIP(ip)
-	// }
-	return
+	return p, nil
 }
 
 func ParseProxyFromClashProxy(p map[string]interface{}) (proxy Proxy, err error) {

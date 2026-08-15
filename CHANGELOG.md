@@ -5,6 +5,18 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.28] - 2026-08-16
+
+### 🐛 修复 /proxies 接口节点名缺失
+
+- **`GetAllProxies` 恢复数据库保存的 name/country**：原先只取 `link` 字段重新解析，
+  启动加载阶段（首轮爬取完成前）`cache.SetProxies("proxies", dbProxies)` 里的节点
+  全部是空名称，导致 `/loon|surge|clash/proxies` 输出 ` = Shadowsocks,...`（name 缺失）
+- **修复 `ParseProxyFromLink` 的 GeoIP 错误泄漏 bug**：GeoIP 查询失败时错误原样返回，
+  导致 `GetAllProxies` 的 `if err == nil` 把解析成功的节点全部丢弃；
+  现 GeoIP 仅用于补充国家信息（失败用 `🏁 ZZ` 默认值），不再否决节点
+- 新增数据库回归测试：验证加载时恢复 name/country、解析字段正确
+
 ## [v1.1.27] - 2026-08-16
 
 ### ⚡ 站点缓存优化
