@@ -35,3 +35,4 @@ assets/flags.json
 
 proxypool*
 config/*
+!config/*.go

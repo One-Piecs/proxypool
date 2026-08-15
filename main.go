@@ -64,8 +64,8 @@ func main() {
 	cdn.GlobalManager.Update()
 
 	log.Infoln("Do the first crawl...")
-	go app.CrawlGo()            // 抓取主程序
-	go cron.Cron()              // 定时运行
-	go cron.CrawlBestNodeTask() // 抓取最佳节点
-	api.Run()                   // Web Serve
+	go app.CrawlGo()      // 抓取主程序
+	go cron.Cron()        // 定时运行
+	go app.BestNodeTask() // 抓取最佳节点
+	api.Run()             // Web Serve
 }

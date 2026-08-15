@@ -1,22 +1,22 @@
 package api
 
 import (
+	"bytes"
+	"errors"
 	"html/template"
 	"net/http"
 	"os"
-	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/One-Piecs/proxypool/internal/cron"
+	"github.com/One-Piecs/proxypool/internal/app"
 
 	"github.com/arl/statsviz"
 
 	"github.com/One-Piecs/proxypool/log"
 	"github.com/One-Piecs/proxypool/pkg/geoIp"
 	"github.com/One-Piecs/proxypool/pkg/provider"
-
-	"github.com/One-Piecs/proxypool/internal/app"
 
 	"github.com/One-Piecs/proxypool/config"
 	appcache "github.com/One-Piecs/proxypool/internal/cache"
@@ -35,6 +35,85 @@ var (
 
 func SetVersion(v string) {
 	version = v
+}
+
+// cachedResponse 缓存的 HTTP 响应
+//
+// 注：gin-contrib/cache 的 SiteCache 只读不写（缓存永远不会被填充，等价于空操作），
+// 此处实现一个可用的站点缓存：未命中时包装 ResponseWriter 记录响应，命中时直接回放。
+type cachedResponse struct {
+	Status int
+	Header http.Header
+	Body   []byte
+}
+
+// cacheWriter 包装 gin.ResponseWriter，拦截响应写入以便缓存
+//
+// 注：gin-contrib/cache 的 SiteCache 只读不写（缓存永远不会被填充，等价于空操作），
+// 此处实现一个可用的站点缓存：未命中时包装 ResponseWriter 记录响应，命中时直接回放。
+type cacheWriter struct {
+	gin.ResponseWriter
+	status int
+	body   bytes.Buffer
+}
+
+func (w *cacheWriter) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *cacheWriter) Write(b []byte) (int, error) {
+	w.body.Write(b)
+	return w.ResponseWriter.Write(b)
+}
+
+func (w *cacheWriter) WriteString(s string) (int, error) {
+	w.body.WriteString(s)
+	return w.ResponseWriter.WriteString(s)
+}
+
+// siteCache 站点响应缓存中间件：
+// 未命中时缓存 2xx 响应，命中时直接回放；
+// 触发类/动态接口（/task/、/health、/link/、/debug/*）通过 skipPrefixes 跳过缓存。
+func siteCache(store persistence.CacheStore, expire time.Duration, skipPrefixes ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		path := c.Request.URL.Path
+		for _, p := range skipPrefixes {
+			if strings.HasPrefix(path, p) {
+				c.Next()
+				return
+			}
+		}
+
+		key := cache.CreateKey(c.Request.RequestURI)
+		var resp cachedResponse
+		if err := store.Get(key, &resp); err == nil {
+			// 命中缓存：回放状态码、响应头与响应体
+			for k, vs := range resp.Header {
+				for _, v := range vs {
+					c.Header(k, v)
+				}
+			}
+			c.Status(resp.Status)
+			_, _ = c.Writer.Write(resp.Body)
+			c.Abort()
+			return
+		}
+
+		// 未命中：包装 writer 记录响应
+		w := &cacheWriter{ResponseWriter: c.Writer, status: http.StatusOK}
+		c.Writer = w
+		c.Next()
+
+		// 仅缓存成功的完整响应，避免缓存错误页与空响应
+		if w.status >= 200 && w.status < 300 && w.body.Len() > 0 {
+			_ = store.Set(key, cachedResponse{
+				Status: w.status,
+				Header: w.Header().Clone(),
+				Body:   w.body.Bytes(),
+			}, expire)
+		}
+	}
 }
 
 // serveProxyList 统一处理 /clash|/surge|/loon|/v2rayn/proxies 四个接口的逻辑：
@@ -82,6 +161,48 @@ func serveProxyList(c *gin.Context, cacheKey string, supportUnderlyingProxy bool
 	return provide(proxies, base)
 }
 
+// subHandler 生成 /ss|/ssr|/vmess|/sip002|/trojan/sub 接口 handler
+func subHandler(types string, provide func(provider.Base) string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		proxies := appcache.GetProxies("proxies")
+		base := provider.Base{Proxies: &proxies, Types: types}
+		c.String(http.StatusOK, provide(base))
+	}
+}
+
+// bestIPHandler 统一 /best* 接口的配置加载与错误处理。
+// config.Parse 带 mtime 缓存，未变化时零开销。
+func bestIPHandler(fn func(c *gin.Context) (string, error)) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if err := config.Parse(""); err != nil {
+			log.Errorln("config parse error: %s", err)
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+		text, err := fn(c)
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+		c.String(http.StatusOK, text)
+	}
+}
+
+// parseBestIPParams 解析 /best* 公共路径与查询参数
+func parseBestIPParams(c *gin.Context) (format, distCountry string) {
+	format = c.Param("format")
+	distCountry = c.Query("d")
+	if distCountry == "" {
+		distCountry = "JP"
+	}
+	return
+}
+
+// isTrue 解析 "true"/"1" 布尔查询参数
+func isTrue(v string) bool {
+	return v == "true" || v == "1"
+}
+
 func setupRouter() {
 	gin.SetMode(gin.ReleaseMode)
 	router = gin.New()              // 没有任何中间件的路由
@@ -92,9 +213,10 @@ func setupRouter() {
 	router.SetHTMLTemplate(temp) // 应用模板
 
 	store := persistence.NewInMemoryStore(time.Minute)
-	router.Use(gin.Recovery(), cache.SiteCache(store, time.Minute)) // 加上处理panic的中间件，防止遇到panic退出程序
+	// 站点响应缓存；触发类/动态接口跳过（/task/*、/health、/link/、/debug/*）
+	router.Use(gin.Recovery(), siteCache(store, time.Minute,
+		"/task/", "/health", "/link/", "/debug/statsviz", "/debug/pprof"))
 
-	// router.Use(gin.Recovery())
 	pprof.Register(router)
 
 	// Create statsviz server.
@@ -110,12 +232,10 @@ func setupRouter() {
 		index(context.Writer, context.Request)
 	})
 
-	// router.StaticFS("/static", http.FS(config.StaticFS))
-
 	router.GET("/static/index.js", func(c *gin.Context) {
 		c.Header("Content-Type", "text/javascript")
 		data, _ := config.StaticFS.ReadFile("assets/static/index.js")
-		c.String(200, string(data))
+		c.String(http.StatusOK, string(data))
 	})
 
 	router.GET("/", func(c *gin.Context) {
@@ -183,373 +303,109 @@ func setupRouter() {
 		text := serveProxyList(c, "clashproxies", false, func(proxies proxy.ProxyList, base provider.Base) string {
 			return provider.Clash{Base: base}.Provide()
 		})
-		c.String(200, text)
+		c.String(http.StatusOK, text)
 	})
 	router.GET("/surge/proxies", func(c *gin.Context) {
 		text := serveProxyList(c, "surgeproxies", true, func(proxies proxy.ProxyList, base provider.Base) string {
 			return provider.Surge{Base: base}.Provide()
 		})
-		c.String(200, text)
+		c.String(http.StatusOK, text)
 	})
 
 	router.GET("/loon/proxies", func(c *gin.Context) {
 		text := serveProxyList(c, "loonproxies", false, func(proxies proxy.ProxyList, base provider.Base) string {
 			return provider.Loon{Base: base}.Provide()
 		})
-		c.String(200, text)
+		c.String(http.StatusOK, text)
 	})
 
 	router.GET("/v2rayn/proxies", func(c *gin.Context) {
 		text := serveProxyList(c, "v2raynproxies", false, func(proxies proxy.ProxyList, base provider.Base) string {
 			return provider.V2rayn{Base: base}.Provide()
 		})
-		c.String(200, text)
+		c.String(http.StatusOK, text)
 	})
 
-	router.GET("/ss/sub", func(c *gin.Context) {
-		proxies := appcache.GetProxies("proxies")
-		ssSub := provider.SSSub{
-			Base: provider.Base{
-				Proxies: &proxies,
-				Types:   "ss",
-			},
-		}
-		c.String(200, ssSub.Provide())
-	})
-	router.GET("/ssr/sub", func(c *gin.Context) {
-		proxies := appcache.GetProxies("proxies")
-		ssrSub := provider.SSRSub{
-			Base: provider.Base{
-				Proxies: &proxies,
-				Types:   "ssr",
-			},
-		}
-		c.String(200, ssrSub.Provide())
-	})
-	router.GET("/vmess/sub", func(c *gin.Context) {
-		proxies := appcache.GetProxies("proxies")
-		vmessSub := provider.VmessSub{
-			Base: provider.Base{
-				Proxies: &proxies,
-				Types:   "vmess",
-			},
-		}
-		c.String(200, vmessSub.Provide())
-	})
-	router.GET("/sip002/sub", func(c *gin.Context) {
-		proxies := appcache.GetProxies("proxies")
-		sip002Sub := provider.SIP002Sub{
-			Base: provider.Base{
-				Proxies: &proxies,
-				Types:   "ss",
-			},
-		}
-		c.String(200, sip002Sub.Provide())
-	})
-	router.GET("/trojan/sub", func(c *gin.Context) {
-		proxies := appcache.GetProxies("proxies")
-		trojanSub := provider.TrojanSub{
-			Base: provider.Base{
-				Proxies: &proxies,
-				Types:   "trojan",
-			},
-		}
-		c.String(200, trojanSub.Provide())
-	})
+	router.GET("/ss/sub", subHandler("ss", func(b provider.Base) string { return provider.SSSub{Base: b}.Provide() }))
+	router.GET("/ssr/sub", subHandler("ssr", func(b provider.Base) string { return provider.SSRSub{Base: b}.Provide() }))
+	router.GET("/vmess/sub", subHandler("vmess", func(b provider.Base) string { return provider.VmessSub{Base: b}.Provide() }))
+	router.GET("/sip002/sub", subHandler("ss", func(b provider.Base) string { return provider.SIP002Sub{Base: b}.Provide() }))
+	router.GET("/trojan/sub", subHandler("trojan", func(b provider.Base) string { return provider.TrojanSub{Base: b}.Provide() }))
+
 	router.GET("/link/:id", func(c *gin.Context) {
-		idx := c.Param("id")
 		proxies := appcache.GetProxies("allproxies")
-		id, err := strconv.Atoi(idx)
+		id, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
-			c.String(500, err.Error())
+			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
 		if id >= proxies.Len() || id < 0 {
-			c.String(500, "id out of range")
+			c.String(http.StatusInternalServerError, "id out of range")
 			return
 		}
-		c.String(200, proxies[id].Link())
+		c.String(http.StatusOK, proxies[id].Link())
 	})
 
+	// 任务接口：后台执行，任务实现（含互斥防并发与 GC）收敛在 internal/app
 	router.GET("/task/crawl", func(c *gin.Context) {
-		go func() {
-			err := app.InitConfigAndGetters("")
-			if err != nil {
-				log.Errorln("config parse error: %s", err)
-			}
-			app.CrawlGo()
-			app.Getters = nil
-			runtime.GC()
-		}()
-		c.String(200, "ok")
+		go app.CrawlTask()
+		c.String(http.StatusOK, "ok")
 	})
-
 	router.GET("/task/speedtest", func(c *gin.Context) {
-		go func() {
-			log.Infoln("Doing speed test task...")
-			err := config.Parse("")
-			if err != nil {
-				log.Errorln("config parse error: %s", err)
-			}
-			pl := appcache.GetProxies("proxies")
-
-			app.SpeedTest(pl)
-			appcache.SetString("clashproxies", provider.Clash{
-				Base: provider.Base{
-					Proxies: &pl,
-				},
-			}.Provide()) // update static string provider
-			appcache.SetString("surgeproxies", provider.Surge{
-				Base: provider.Base{
-					Proxies: &pl,
-				},
-			}.Provide())
-			appcache.SetString("loonproxies", provider.Loon{
-				Base: provider.Base{
-					Proxies: &pl,
-				},
-			}.Provide())
-			runtime.GC()
-		}()
-		c.String(200, "ok")
+		go app.SpeedTestTask()
+		c.String(http.StatusOK, "ok")
 	})
-
 	router.GET("/task/updateGeoIP", func(c *gin.Context) {
-		go func() {
-			log.Infoln("Reloading GeoIP...")
-			// geoIp.ReInitGeoIpDB()
-			geoIp.UpdateGeoIP()
-			runtime.GC()
-		}()
-		c.String(200, "ok")
+		go app.GeoIPTask()
+		c.String(http.StatusOK, "ok")
 	})
-
 	router.GET("/task/updateBestNode", func(c *gin.Context) {
-		go func() {
-			log.Infoln("updateBestNode...")
-			cron.CrawlBestNodeTask()
-			runtime.GC()
-		}()
-		c.String(200, "ok")
+		go app.BestNodeTask()
+		c.String(http.StatusOK, "ok")
 	})
 
-	router.GET("/bestProxyIp/:format", func(c *gin.Context) {
-		err := config.Parse("")
-		if err != nil {
-			log.Errorln("config parse error: %s", err)
-			c.String(500, err.Error())
-			return
-		}
-
-		format := c.Param("format")
-		distNodeCountry := c.Query("d")
-		if distNodeCountry == "" {
-			distNodeCountry = "JP"
-		}
-		// 获取并解析limit参数
-		limitStr := c.Query("limit")
+	router.GET("/bestProxyIp/:format", bestIPHandler(func(c *gin.Context) (string, error) {
+		format, distCountry := parseBestIPParams(c)
 		limit := 0
-		if limitStr != "" {
-			limit, err = strconv.Atoi(limitStr)
+		if s := c.Query("limit"); s != "" {
+			n, err := strconv.Atoi(s)
 			if err != nil {
-				c.String(500, "invalid limit parameter")
-				return
+				return "", errors.New("invalid limit parameter")
 			}
+			limit = n
 		}
-		// 获取并解析random参数
-		random := false
-		if c.Query("random") == "true" {
-			random = true
-		}
+		return app.SubNiceProxyIp(format, distCountry, c.Query("c"), limit, isTrue(c.Query("random")), isTrue(c.Query("ipv6")), c.Query("cdn"))
+	}))
 
-		isIPV6 := false
-		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
-			isIPV6 = true
-		}
+	router.GET("/bestCfProxyIp/:format", bestIPHandler(func(c *gin.Context) (string, error) {
+		format, distCountry := parseBestIPParams(c)
+		return app.SubNiceCfProxyIp(format, distCountry, isTrue(c.Query("ipv6")))
+	}))
 
-		cdnFilter := c.Query("cdn")
+	router.GET("/bestCfProxyDomainTop20/:format", bestIPHandler(func(c *gin.Context) (string, error) {
+		format, distCountry := parseBestIPParams(c)
+		return app.SubNiceCfProxyIpTop20(format, distCountry, isTrue(c.Query("ips")), isTrue(c.Query("ipv6")))
+	}))
 
-		text, err := app.SubNiceProxyIp(format, distNodeCountry, c.Query("c"), limit, random, isIPV6, cdnFilter)
-		if err != nil {
-			c.String(500, err.Error())
-			return
-		}
-		c.String(200, text)
-	})
+	router.GET("/bestCfProxyIpTop20/:format", bestIPHandler(func(c *gin.Context) (string, error) {
+		format, distCountry := parseBestIPParams(c)
+		return app.SubNiceCfProxyIpTop20(format, distCountry, true, isTrue(c.Query("ipv6")))
+	}))
 
-	router.GET("/bestCfProxyIp/:format", func(c *gin.Context) {
-		err := config.Parse("")
-		if err != nil {
-			log.Errorln("config parse error: %s", err)
-			c.String(500, err.Error())
-			return
-		}
+	router.GET("/bestCfProxyIpIsp/:format", bestIPHandler(func(c *gin.Context) (string, error) {
+		format, distCountry := parseBestIPParams(c)
+		return app.SubNiceCfProxyIpProvider(format, c.Query("isp"), distCountry, isTrue(c.Query("ipv6")))
+	}))
 
-		format := c.Param("format")
-		distNodeCountry := c.Query("d")
-		if distNodeCountry == "" {
-			distNodeCountry = "JP"
-		}
+	router.GET("/bestCfProxySub/:format", bestIPHandler(func(c *gin.Context) (string, error) {
+		format, distCountry := parseBestIPParams(c)
+		return app.SubNiceCfProxySub(format, c.Query("sub"), distCountry, isTrue(c.Query("ipv6")))
+	}))
 
-		isIPV6 := false
-		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
-			isIPV6 = true
-		}
-
-		text, err := app.SubNiceCfProxyIp(format, distNodeCountry, isIPV6)
-		if err != nil {
-			c.String(500, err.Error())
-			return
-		}
-		c.String(200, text)
-	})
-
-	router.GET("/bestCfProxyDomainTop20/:format", func(c *gin.Context) {
-		err := config.Parse("")
-		if err != nil {
-			log.Errorln("config parse error: %s", err)
-			c.String(500, err.Error())
-			return
-		}
-
-		format := c.Param("format")
-		distNodeCountry := c.Query("d")
-		if distNodeCountry == "" {
-			distNodeCountry = "JP"
-		}
-
-		isConvertIp := false
-		if c.Query("ips") == "true" || c.Query("ips") == "1" {
-			isConvertIp = true
-		}
-
-		isIPV6 := false
-		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
-			isIPV6 = true
-		}
-
-		text, err := app.SubNiceCfProxyIpTop20(format, distNodeCountry, isConvertIp, isIPV6)
-		if err != nil {
-			c.String(500, err.Error())
-			return
-		}
-		c.String(200, text)
-	})
-
-	router.GET("/bestCfProxyIpTop20/:format", func(c *gin.Context) {
-		err := config.Parse("")
-		if err != nil {
-			log.Errorln("config parse error: %s", err)
-			c.String(500, err.Error())
-			return
-		}
-
-		format := c.Param("format")
-		distNodeCountry := c.Query("d")
-		if distNodeCountry == "" {
-			distNodeCountry = "JP"
-		}
-
-		isIPV6 := false
-		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
-			isIPV6 = true
-		}
-
-		text, err := app.SubNiceCfProxyIpTop20(format, distNodeCountry, true, isIPV6)
-		if err != nil {
-			c.String(500, err.Error())
-			return
-		}
-		c.String(200, text)
-	})
-
-	router.GET("/bestCfProxyIpIsp/:format", func(c *gin.Context) {
-		err := config.Parse("")
-		if err != nil {
-			log.Errorln("config parse error: %s", err)
-			c.String(500, err.Error())
-			return
-		}
-
-		format := c.Param("format")
-
-		distNodeCountry := c.Query("d")
-		if distNodeCountry == "" {
-			distNodeCountry = "JP"
-		}
-
-		isp := c.Query("isp")
-
-		isIPV6 := false
-		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
-			isIPV6 = true
-		}
-
-		text, err := app.SubNiceCfProxyIpProvider(format, isp, distNodeCountry, isIPV6)
-		if err != nil {
-			c.String(500, err.Error())
-			return
-		}
-		c.String(200, text)
-	})
-
-	router.GET("/bestCfProxySub/:format", func(c *gin.Context) {
-		err := config.Parse("")
-		if err != nil {
-			log.Errorln("config parse error: %s", err)
-			c.String(500, err.Error())
-			return
-		}
-
-		format := c.Param("format")
-
-		distNodeCountry := c.Query("d")
-		if distNodeCountry == "" {
-			distNodeCountry = "JP"
-		}
-
-		sub := c.Query("sub")
-
-		isIPV6 := false
-		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
-			isIPV6 = true
-		}
-
-		text, err := app.SubNiceCfProxySub(format, sub, distNodeCountry, isIPV6)
-		if err != nil {
-			c.String(500, err.Error())
-			return
-		}
-		c.String(200, text)
-	})
-
-	router.GET("/bestIpKr/:format", func(c *gin.Context) {
-		err := config.Parse("")
-		if err != nil {
-			log.Errorln("config parse error: %s", err)
-			c.String(500, err.Error())
-			return
-		}
-
-		format := c.Param("format")
-		// 获取并解析random参数
-		random := false
-		if c.Query("random") == "true" {
-			random = true
-		}
-
-		isIPV6 := false
-		if c.Query("ipv6") == "true" || c.Query("ipv6") == "1" {
-			isIPV6 = true
-		}
-
-		text, err := app.SubNiceProxyIp(format, "KR", c.Query("c"), 0, random, isIPV6, c.Query("cdn"))
-		if err != nil {
-			c.String(500, err.Error())
-			return
-		}
-		c.String(200, text)
-	})
+	router.GET("/bestIpKr/:format", bestIPHandler(func(c *gin.Context) (string, error) {
+		format, _ := parseBestIPParams(c)
+		return app.SubNiceProxyIp(format, "KR", c.Query("c"), 0, isTrue(c.Query("random")), isTrue(c.Query("ipv6")), c.Query("cdn"))
+	}))
 }
 
 func Run() {

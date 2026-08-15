@@ -5,7 +5,9 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/One-Piecs/proxypool/pkg/tool"
 	"gopkg.in/yaml.v3"
@@ -44,6 +46,21 @@ type ConfigOptions struct {
 
 var gCfg atomic.Value
 
+// 配置解析缓存：避免每次请求都重新读取/解析配置文件。
+// 本地文件按 mtime 判断是否变化（保留热更新能力）；
+// http(s) 源按 TTL 刷新。所有调用点（cron、API、任务）统一受益。
+const urlConfigTTL = 60 * time.Second
+
+var (
+	parseMu    sync.Mutex
+	parsedInfo = make(map[string]parsedMeta)
+)
+
+type parsedMeta struct {
+	mtime      time.Time // 本地文件修改时间
+	validUntil time.Time // URL 源有效截止时间
+}
+
 // Config 配置
 // var Config ConfigOptions
 func Config() *ConfigOptions {
@@ -53,13 +70,49 @@ func Config() *ConfigOptions {
 	return &ConfigOptions{}
 }
 
-// Parse 解析配置文件，支持本地文件系统和网络链接
+// isConfigFresh 判断配置是否仍有效（无需重新解析）
+func isConfigFresh(path string) bool {
+	info, ok := parsedInfo[path]
+	if !ok {
+		return false
+	}
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		return time.Now().Before(info.validUntil)
+	}
+	st, err := os.Stat(path)
+	if err != nil {
+		return false // 文件不存在/不可读，重新解析（会再次报错）
+	}
+	return st.ModTime().Equal(info.mtime)
+}
+
+// recordParsed 记录本次解析后的配置有效性
+func recordParsed(path string) {
+	meta := parsedMeta{}
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		meta.validUntil = time.Now().Add(urlConfigTTL)
+	} else if st, err := os.Stat(path); err == nil {
+		meta.mtime = st.ModTime()
+	}
+	parsedInfo[path] = meta
+}
+
+// Parse 解析配置文件，支持本地文件系统和网络链接。
+// 配置源未变化时直接返回（不重复解析）。
 func Parse(path string) error {
 	if path == "" {
 		path = configFilePath
 	} else {
 		configFilePath = path
 	}
+
+	parseMu.Lock()
+	defer parseMu.Unlock()
+
+	if isConfigFresh(path) {
+		return nil
+	}
+
 	fileData, err := ReadFile(path)
 	if err != nil {
 		return err
@@ -117,6 +170,7 @@ func Parse(path string) error {
 	}
 
 	gCfg.Store(&cfg)
+	recordParsed(path)
 
 	return nil
 }

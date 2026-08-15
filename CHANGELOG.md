@@ -5,6 +5,29 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.23] - 2026-08-16
+
+### ⚡ API 路由与配置加载优化
+
+- **`config.Parse` 加缓存**：本地文件按 mtime 判断是否变化（保留热更新），
+  http(s) 源按 60s TTL 刷新。原先 `/best*` 接口每次请求都重新读文件/网络 + YAML 解析，
+  URL 配置源则每次请求都发 HTTP GET；现未变化时零开销
+- **修复站点缓存中间件**：gin-contrib/cache 的 `SiteCache` 只读不写（从不填充缓存，
+  等价于空操作）；改为自实现中间件——未命中时包装 ResponseWriter 记录 2xx 响应，
+  命中时直接回放，HTML 页面/订阅接口获得真实 1 分钟 HTTP 缓存
+- **触发类接口排除缓存**：`/task/*`、`/health`、`/link/`、`/debug/*` 跳过响应缓存，
+  确保手动触发任务/健康检查/动态链接不被缓存拦截
+- **7 个 `/best*` handler 收敛**：统一 `bestIPHandler`（配置加载+错误处理）、
+  `parseBestIPParams`（d 默认 JP）、`isTrue`（"true"/"1"）辅助函数，
+  每个 handler 由 ~50 行缩至 3-6 行
+- **5 个 `/xx/sub` handler 收敛**为 `subHandler` 一行式注册
+- **任务统一收敛 `internal/app`**：`CrawlTask`/`SpeedTestTask`/`ActiveSpeedTestTask`/
+  `BestNodeTask`/`GeoIPTask` 供 cron 与 API 共用，消除重复逻辑；
+  `RunExclusive` 互斥防并发——任务运行中再次触发直接跳过（日志提示），
+  避免 cron 与手动触发并发抓取/测速
+- `/task/*` handler 不再各自重复 `runtime.GC()`（收敛到 RunExclusive）
+- 新增单元测试：`config.Parse` 缓存命中/失效、站点缓存命中/排除
+
 ## [v1.1.22] - 2026-08-16
 
 ### 🔧 CI/CD
