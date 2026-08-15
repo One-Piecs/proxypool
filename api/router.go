@@ -20,6 +20,7 @@ import (
 
 	"github.com/One-Piecs/proxypool/config"
 	appcache "github.com/One-Piecs/proxypool/internal/cache"
+	"github.com/One-Piecs/proxypool/pkg/proxy"
 	"github.com/gin-contrib/cache"
 	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-contrib/pprof"
@@ -34,6 +35,51 @@ var (
 
 func SetVersion(v string) {
 	version = v
+}
+
+// serveProxyList 统一处理 /clash|/surge|/loon|/v2rayn/proxies 四个接口的逻辑：
+// 解析公共筛选参数，无筛选时优先返回缓存，type=all 时使用全量代理。
+func serveProxyList(c *gin.Context, cacheKey string, supportUnderlyingProxy bool, provide func(proxy.ProxyList, provider.Base) string) string {
+	proxyTypes := c.DefaultQuery("type", "")
+	proxyCountry := c.DefaultQuery("c", "")
+	proxyNotCountry := c.DefaultQuery("nc", "")
+	proxySpeed := c.DefaultQuery("speed", "")
+	proxyFilter := c.DefaultQuery("filter", "")
+	proxyUnderlyingProxy := c.DefaultQuery("underlyingproxy", "")
+
+	noFilter := proxyTypes == "" && proxyCountry == "" && proxyNotCountry == "" &&
+		proxySpeed == "" && proxyFilter == "" &&
+		(!supportUnderlyingProxy || proxyUnderlyingProxy == "")
+
+	base := provider.Base{
+		Types:           proxyTypes,
+		Country:         proxyCountry,
+		NotCountry:      proxyNotCountry,
+		Speed:           proxySpeed,
+		Filter:          proxyFilter,
+		UnderlyingProxy: proxyUnderlyingProxy,
+	}
+
+	if noFilter {
+		// 命中缓存则直接返回；否则生成一次并缓存（测速后由任务刷新）
+		if text := appcache.GetString(cacheKey); text != "" {
+			return text
+		}
+		proxies := appcache.GetProxies("proxies")
+		base.Proxies = &proxies
+		text := provide(proxies, base)
+		appcache.SetString(cacheKey, text)
+		return text
+	}
+
+	// 根据Query筛选节点：type=all 使用全量节点，否则使用可用节点
+	key := "proxies"
+	if proxyTypes == "all" {
+		key = "allproxies"
+	}
+	proxies := appcache.GetProxies(key)
+	base.Proxies = &proxies
+	return provide(proxies, base)
 }
 
 func setupRouter() {
@@ -134,200 +180,29 @@ func setupRouter() {
 	})
 
 	router.GET("/clash/proxies", func(c *gin.Context) {
-		proxyTypes := c.DefaultQuery("type", "")
-		proxyCountry := c.DefaultQuery("c", "")
-		proxyNotCountry := c.DefaultQuery("nc", "")
-		proxySpeed := c.DefaultQuery("speed", "")
-		proxyFilter := c.DefaultQuery("filter", "")
-		text := ""
-		if proxyTypes == "" && proxyCountry == "" && proxyNotCountry == "" && proxySpeed == "" && proxyFilter == "" {
-			text = appcache.GetString("clashproxies") // A string. To show speed in this if condition, this must be updated after speedtest
-			if text == "" {
-				proxies := appcache.GetProxies("proxies")
-				clash := provider.Clash{
-					Base: provider.Base{
-						Proxies: &proxies,
-					},
-				}
-				text = clash.Provide() // 根据Query筛选节点
-				appcache.SetString("clashproxies", text)
-			}
-		} else if proxyTypes == "all" {
-			proxies := appcache.GetProxies("allproxies")
-			clash := provider.Clash{
-				Base: provider.Base{
-					Proxies:    &proxies,
-					Types:      proxyTypes,
-					Country:    proxyCountry,
-					NotCountry: proxyNotCountry,
-					Speed:      proxySpeed,
-					Filter:     proxyFilter,
-				},
-			}
-			text = clash.Provide() // 根据Query筛选节点
-		} else {
-			proxies := appcache.GetProxies("proxies")
-			clash := provider.Clash{
-				Base: provider.Base{
-					Proxies:    &proxies,
-					Types:      proxyTypes,
-					Country:    proxyCountry,
-					NotCountry: proxyNotCountry,
-					Speed:      proxySpeed,
-					Filter:     proxyFilter,
-				},
-			}
-			text = clash.Provide() // 根据Query筛选节点
-		}
+		text := serveProxyList(c, "clashproxies", false, func(proxies proxy.ProxyList, base provider.Base) string {
+			return provider.Clash{Base: base}.Provide()
+		})
 		c.String(200, text)
 	})
 	router.GET("/surge/proxies", func(c *gin.Context) {
-		proxyTypes := c.DefaultQuery("type", "")
-		proxyCountry := c.DefaultQuery("c", "")
-		proxyNotCountry := c.DefaultQuery("nc", "")
-		proxySpeed := c.DefaultQuery("speed", "")
-		proxyFilter := c.DefaultQuery("filter", "")
-		proxyUnderlyingProxy := c.DefaultQuery("underlyingproxy", "")
-		text := ""
-		if proxyTypes == "" && proxyCountry == "" && proxyNotCountry == "" && proxySpeed == "" && proxyFilter == "" && proxyUnderlyingProxy == "" {
-			text = appcache.GetString("surgeproxies") // A string. To show speed in this if condition, this must be updated after speedtest
-			if text == "" {
-				proxies := appcache.GetProxies("proxies")
-				surge := provider.Surge{
-					Base: provider.Base{
-						Proxies: &proxies,
-					},
-				}
-				text = surge.Provide()
-				appcache.SetString("surgeproxies", text)
-			}
-		} else if proxyTypes == "all" {
-			proxies := appcache.GetProxies("allproxies")
-			surge := provider.Surge{
-				Base: provider.Base{
-					Proxies:         &proxies,
-					Types:           proxyTypes,
-					Country:         proxyCountry,
-					NotCountry:      proxyNotCountry,
-					Speed:           proxySpeed,
-					Filter:          proxyFilter,
-					UnderlyingProxy: proxyUnderlyingProxy,
-				},
-			}
-			text = surge.Provide()
-		} else {
-			proxies := appcache.GetProxies("proxies")
-			surge := provider.Surge{
-				Base: provider.Base{
-					Proxies:         &proxies,
-					Types:           proxyTypes,
-					Country:         proxyCountry,
-					NotCountry:      proxyNotCountry,
-					Speed:           proxySpeed,
-					Filter:          proxyFilter,
-					UnderlyingProxy: proxyUnderlyingProxy,
-				},
-			}
-			text = surge.Provide()
-		}
+		text := serveProxyList(c, "surgeproxies", true, func(proxies proxy.ProxyList, base provider.Base) string {
+			return provider.Surge{Base: base}.Provide()
+		})
 		c.String(200, text)
 	})
 
 	router.GET("/loon/proxies", func(c *gin.Context) {
-		proxyTypes := c.DefaultQuery("type", "")
-		proxyCountry := c.DefaultQuery("c", "")
-		proxyNotCountry := c.DefaultQuery("nc", "")
-		proxySpeed := c.DefaultQuery("speed", "")
-		proxyFilter := c.DefaultQuery("filter", "")
-		text := ""
-		if proxyTypes == "" && proxyCountry == "" && proxyNotCountry == "" && proxySpeed == "" && proxyFilter == "" {
-			text = appcache.GetString("loonproxies") // A string. To show speed in this if condition, this must be updated after speedtest
-			if text == "" {
-				proxies := appcache.GetProxies("proxies")
-				loon := provider.Loon{
-					Base: provider.Base{
-						Proxies: &proxies,
-					},
-				}
-				text = loon.Provide() // 根据Query筛选节点
-				appcache.SetString("loonproxies", text)
-			}
-		} else if proxyTypes == "all" {
-			proxies := appcache.GetProxies("allproxies")
-			loon := provider.Loon{
-				Base: provider.Base{
-					Proxies:    &proxies,
-					Types:      proxyTypes,
-					Country:    proxyCountry,
-					NotCountry: proxyNotCountry,
-					Speed:      proxySpeed,
-					Filter:     proxyFilter,
-				},
-			}
-			text = loon.Provide() // 根据Query筛选节点
-		} else {
-			proxies := appcache.GetProxies("proxies")
-			loon := provider.Loon{
-				Base: provider.Base{
-					Proxies:    &proxies,
-					Types:      proxyTypes,
-					Country:    proxyCountry,
-					NotCountry: proxyNotCountry,
-					Speed:      proxySpeed,
-					Filter:     proxyFilter,
-				},
-			}
-			text = loon.Provide() // 根据Query筛选节点
-		}
+		text := serveProxyList(c, "loonproxies", false, func(proxies proxy.ProxyList, base provider.Base) string {
+			return provider.Loon{Base: base}.Provide()
+		})
 		c.String(200, text)
 	})
 
 	router.GET("/v2rayn/proxies", func(c *gin.Context) {
-		proxyTypes := c.DefaultQuery("type", "")
-		proxyCountry := c.DefaultQuery("c", "")
-		proxyNotCountry := c.DefaultQuery("nc", "")
-		proxySpeed := c.DefaultQuery("speed", "")
-		proxyFilter := c.DefaultQuery("filter", "")
-		text := ""
-		if proxyTypes == "" && proxyCountry == "" && proxyNotCountry == "" && proxySpeed == "" && proxyFilter == "" {
-			text = appcache.GetString("v2raynproxies")
-			if text == "" {
-				proxies := appcache.GetProxies("proxies")
-				v2rayn := provider.V2rayn{
-					Base: provider.Base{
-						Proxies: &proxies,
-					},
-				}
-				text = v2rayn.Provide()
-				appcache.SetString("v2raynproxies", text)
-			}
-		} else if proxyTypes == "all" {
-			proxies := appcache.GetProxies("allproxies")
-			v2rayn := provider.V2rayn{
-				Base: provider.Base{
-					Proxies:    &proxies,
-					Types:      proxyTypes,
-					Country:    proxyCountry,
-					NotCountry: proxyNotCountry,
-					Speed:      proxySpeed,
-					Filter:     proxyFilter,
-				},
-			}
-			text = v2rayn.Provide()
-		} else {
-			proxies := appcache.GetProxies("proxies")
-			v2rayn := provider.V2rayn{
-				Base: provider.Base{
-					Proxies:    &proxies,
-					Types:      proxyTypes,
-					Country:    proxyCountry,
-					NotCountry: proxyNotCountry,
-					Speed:      proxySpeed,
-					Filter:     proxyFilter,
-				},
-			}
-			text = v2rayn.Provide()
-		}
+		text := serveProxyList(c, "v2raynproxies", false, func(proxies proxy.ProxyList, base provider.Base) string {
+			return provider.V2rayn{Base: base}.Provide()
+		})
 		c.String(200, text)
 	})
 
@@ -387,9 +262,11 @@ func setupRouter() {
 		id, err := strconv.Atoi(idx)
 		if err != nil {
 			c.String(500, err.Error())
+			return
 		}
 		if id >= proxies.Len() || id < 0 {
 			c.String(500, "id out of range")
+			return
 		}
 		c.String(200, proxies[id].Link())
 	})

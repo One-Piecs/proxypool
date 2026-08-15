@@ -6,11 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
-	"sync"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/One-Piecs/proxypool/log"
 	"github.com/One-Piecs/proxypool/pkg/proxy"
@@ -30,31 +28,27 @@ var (
 
 func CheckWorkpool(proxies proxy.ProxyList) {
 	pool := workerpool.New(500)
-	m := sync.Mutex{}
+	progress := newProgress(len(proxies))
 
 	log.Infoln("ChatGPT Test ON")
-	doneCount := 0
-	total := len(proxies)
 
 	for _, p := range proxies {
 		pp := p
 		pool.Submit(func() {
+			defer progress.inc()
 			ok, err := testOpenai(pp)
 			if err == nil && ok {
-				m.Lock()
+				statsLock.Lock()
 				if ps, ok := ProxyStats.Find(pp); ok {
 					ps.ChatGPT = true
 				}
-				m.Unlock()
+				statsLock.Unlock()
 			}
-			doneCount++
-			progress := float64(doneCount) * 100 / float64(total)
-			fmt.Printf("\r\t[%5.1f%% DONE]", progress)
 		})
 	}
 
 	pool.StopWait()
-	fmt.Println()
+	log.Infoln("ChatGPT Test Done")
 }
 
 var SupportCountry = []string{"AL", "DZ", "AD", "AO", "AG", "AR", "AM", "AU", "AT", "AZ", "BS", "BD", "BB", "BE", "BZ", "BJ", "BT", "BA", "BW", "BR", "BG", "BF", "CV", "CA", "CL", "CO", "KM", "CR", "HR", "CY", "DK", "DJ", "DM", "DO", "EC", "SV", "EE", "FJ", "FI", "FR", "GA", "GM", "GE", "DE", "GH", "GR", "GD", "GT", "GN", "GW", "GY", "HT", "HN", "HU", "IS", "IN", "ID", "IQ", "IE", "IL", "IT", "JM", "JP", "JO", "KZ", "KE", "KI", "KW", "KG", "LV", "LB", "LS", "LR", "LI", "LT", "LU", "MG", "MW", "MY", "MV", "ML", "MT", "MH", "MR", "MU", "MX", "MC", "MN", "ME", "MA", "MZ", "MM", "NA", "NR", "NP", "NL", "NZ", "NI", "NE", "NG", "MK", "NO", "OM", "PK", "PW", "PA", "PG", "PE", "PH", "PL", "PT", "QA", "RO", "RW", "KN", "LC", "VC", "WS", "SM", "ST", "SN", "RS", "SC", "SL", "SG", "SK", "SI", "SB", "ZA", "ES", "LK", "SR", "SE", "CH", "TH", "TG", "TO", "TT", "TN", "TR", "TV", "UG", "AE", "US", "UY", "VU", "ZM", "BO", "BN", "CG", "CZ", "VA", "FM", "MD", "PS", "KR", "TW", "TZ", "TL", "GB"}

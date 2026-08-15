@@ -3,9 +3,7 @@ package healthcheck
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/gammazero/workerpool"
@@ -14,75 +12,22 @@ import (
 
 	"github.com/One-Piecs/proxypool/log"
 	"github.com/One-Piecs/proxypool/pkg/proxy"
-	"github.com/ivpusic/grpool"
 )
 
-func RelayCheck(proxies proxy.ProxyList) {
-	pool := grpool.NewPool(500, 200)
-	pool.WaitCount(len(proxies))
-	m := sync.Mutex{}
-
-	log.Infoln("Relay Test ON")
-	doneCount := 0
-	go func() {
-		for _, p := range proxies {
-			pp := p
-			pool.JobQueue <- func() {
-				defer pool.JobDone()
-				out, err := testRelay(pp)
-				if err == nil && out != "" {
-					m.Lock()
-					// Relay or pool
-					if isRelay(pp.BaseInfo().Server, out) {
-						if ps, ok := ProxyStats.Find(pp); ok {
-							ps.UpdatePSOutIp(out)
-							ps.Relay = true
-						} else {
-							ps = &Stat{
-								Id:    pp.Identifier(),
-								Relay: true,
-								OutIp: out,
-							}
-							ProxyStats = append(ProxyStats, *ps)
-						}
-					} else { // is pool ip
-						if ps, ok := ProxyStats.Find(pp); ok {
-							ps.UpdatePSOutIp(out)
-							ps.Pool = true
-						} else {
-							ps = &Stat{
-								Id:    pp.Identifier(),
-								Pool:  true,
-								OutIp: out,
-							}
-							ProxyStats = append(ProxyStats, *ps)
-						}
-					}
-					m.Unlock()
-				}
-				doneCount++
-				progress := float64(doneCount) * 100 / float64(len(proxies))
-				fmt.Printf("\r\t[%5.1f%% DONE]", progress)
-			}
-		}
-	}()
-	pool.WaitAll()
-	pool.Release()
-	fmt.Println()
-}
-
+// RelayCheckWorkpool 检测代理是否经过中转/池化，结果写入 ProxyStats。
 func RelayCheckWorkpool(proxies proxy.ProxyList) {
 	pool := workerpool.New(500)
-	m := sync.Mutex{}
+	progress := newProgress(len(proxies))
 
 	log.Infoln("Relay Test ON")
-	doneCount := 0
 
 	for _, p := range proxies {
 		pp := p
 		pool.Submit(func() {
+			defer progress.inc()
 			out, err := testRelay(pp)
 			if err == nil && out != "" {
+				statsLock.Lock()
 				// Relay or pool
 				if isRelay(pp.BaseInfo().Server, out) {
 					if ps, ok := ProxyStats.Find(pp); ok {
@@ -94,9 +39,7 @@ func RelayCheckWorkpool(proxies proxy.ProxyList) {
 							Relay: true,
 							OutIp: out,
 						}
-						m.Lock()
 						ProxyStats = append(ProxyStats, *ps)
-						m.Unlock()
 					}
 				} else { // is pool ip
 					if ps, ok := ProxyStats.Find(pp); ok {
@@ -108,20 +51,16 @@ func RelayCheckWorkpool(proxies proxy.ProxyList) {
 							Pool:  true,
 							OutIp: out,
 						}
-						m.Lock()
 						ProxyStats = append(ProxyStats, *ps)
-						m.Unlock()
 					}
 				}
+				statsLock.Unlock()
 			}
-			doneCount++
-			progress := float64(doneCount) * 100 / float64(len(proxies))
-			fmt.Printf("\r\t[%5.1f%% DONE]", progress)
 		})
 	}
 
 	pool.StopWait()
-	fmt.Println()
+	log.Infoln("Relay Test Done")
 }
 
 // Get outbound relay ip

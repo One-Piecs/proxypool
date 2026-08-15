@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,7 +17,6 @@ import (
 	"github.com/One-Piecs/proxypool/config"
 	"github.com/One-Piecs/proxypool/log"
 	"github.com/One-Piecs/proxypool/pkg/proxy"
-	"github.com/ivpusic/grpool"
 	C "github.com/metacubex/mihomo/constant"
 )
 
@@ -27,57 +25,7 @@ var (
 	SpeedExist   = false
 )
 
-// SpeedTestAll tests speed of a group of proxies. Results are stored in ProxyStats
-func SpeedTestAll(proxies []proxy.Proxy, conns int) {
-	SpeedExist = true
-	if ok := checkErrorProxies(proxies); !ok {
-		return
-	}
-	numWorker := conns
-	if numWorker <= 0 {
-		numWorker = 5
-	}
-	numJob := 1
-	if numWorker > 4 {
-		numJob = (numWorker + 2) / 4
-	}
-	resultCount := 0
-	m := sync.Mutex{}
-
-	log.Infoln("Speed Test ON")
-	doneCount := 0
-	// use grpool
-	pool := grpool.NewPool(numWorker, numJob)
-	pool.WaitCount(len(proxies))
-	for _, p := range proxies {
-		pp := p
-		pool.JobQueue <- func() {
-			defer pool.JobDone()
-			speed, err := ProxySpeedTest(pp)
-			if err == nil || speed > 0 {
-				m.Lock()
-				if proxyStat, ok := ProxyStats.Find(pp); ok {
-					proxyStat.UpdatePSSpeed(speed)
-				} else {
-					ProxyStats = append(ProxyStats, Stat{
-						Id:    pp.Identifier(),
-						Speed: speed,
-					})
-				}
-				resultCount++
-				m.Unlock()
-			}
-			doneCount++
-			progress := float64(doneCount) * 100 / float64(len(proxies))
-			fmt.Printf("\r\t[%5.1f%% DONE]", progress)
-		}
-	}
-	pool.WaitAll()
-	pool.Release()
-	fmt.Println()
-	log.Infoln("Speed Test Done. Count all speed results: %d", resultCount)
-}
-
+// SpeedTestAllWithWorkpool tests speed of a group of proxies. Results are stored in ProxyStats
 func SpeedTestAllWithWorkpool(proxies []proxy.Proxy, conns int) {
 	SpeedExist = true
 	if ok := checkErrorProxies(proxies); !ok {
@@ -89,19 +37,18 @@ func SpeedTestAllWithWorkpool(proxies []proxy.Proxy, conns int) {
 	}
 
 	resultCount := 0
-	m := sync.Mutex{}
+	progress := newProgress(len(proxies))
 
 	log.Infoln("Speed Test ON")
-	doneCount := 0
-	// use grpool
-	pool := workerpool.New(numWorker)
 
+	pool := workerpool.New(numWorker)
 	for _, p := range proxies {
 		pp := p
 		pool.Submit(func() {
+			defer progress.inc()
 			speed, err := ProxySpeedTest(pp)
-			if err == nil || speed > 0 {
-				m.Lock()
+			if err == nil && speed > 0 {
+				statsLock.Lock()
 				if proxyStat, ok := ProxyStats.Find(pp); ok {
 					proxyStat.UpdatePSSpeed(speed)
 				} else {
@@ -111,78 +58,16 @@ func SpeedTestAllWithWorkpool(proxies []proxy.Proxy, conns int) {
 					})
 				}
 				resultCount++
-				m.Unlock()
+				statsLock.Unlock()
 			}
-
-			doneCount++
-			progress := float64(doneCount) * 100 / float64(len(proxies))
-			fmt.Printf("\r\t[%5.1f%% DONE]", progress)
 		})
 	}
 	pool.StopWait()
-	fmt.Println()
 	log.Infoln("Speed Test Done. Count all speed results: %d", resultCount)
 }
 
-// SpeedTestNew tests speed of new proxies which is not in ProxyStats. Then appended to ProxyStats
-func SpeedTestNew(proxies []proxy.Proxy, conns int) {
-	SpeedExist = true
-	if ok := checkErrorProxies(proxies); !ok {
-		return
-	}
-	numWorker := conns
-	if numWorker <= 0 {
-		numWorker = 5
-	}
-	numJob := 1
-	if numWorker > 4 {
-		numJob = (numWorker + 2) / 4
-	}
-	resultCount := 0
-	m := sync.Mutex{}
-
-	log.Infoln("Speed Test ON")
-	doneCount := 0
-	// use grpool
-	pool := grpool.NewPool(numWorker, numJob)
-	pool.WaitCount(len(proxies))
-	for _, p := range proxies {
-		pp := p
-		pool.JobQueue <- func() {
-			defer pool.JobDone()
-			m.Lock()
-			proxyStat, ok := ProxyStats.Find(pp)
-			m.Unlock()
-			if !ok {
-				// when proxy's Stat not exits
-				speed, err := ProxySpeedTest(pp)
-				if err == nil || speed > 0 {
-					m.Lock()
-					ProxyStats = append(ProxyStats, Stat{
-						Id:    pp.Identifier(),
-						Speed: speed,
-					})
-					resultCount++
-					m.Unlock()
-				}
-			} else if proxyStat.Speed == 0 {
-				speed, err := ProxySpeedTest(pp)
-				if err == nil || speed > 0 {
-					proxyStat.UpdatePSSpeed(speed)
-					resultCount++
-				}
-			}
-			doneCount++
-			progress := float64(doneCount) * 100 / float64(len(proxies))
-			fmt.Printf("\r\t[%5.1f%% DONE]", progress)
-		}
-	}
-	pool.WaitAll()
-	pool.Release()
-	fmt.Println()
-	log.Infoln("Speed Test Done. New speed results count: %d", resultCount)
-}
-
+// SpeedTestNewWithWorkpool tests speed of new proxies which is not in ProxyStats or
+// whose speed is still 0. Then appended to ProxyStats.
 func SpeedTestNewWithWorkpool(proxies []proxy.Proxy, conns int) {
 	SpeedExist = true
 	if ok := checkErrorProxies(proxies); !ok {
@@ -194,45 +79,42 @@ func SpeedTestNewWithWorkpool(proxies []proxy.Proxy, conns int) {
 	}
 
 	resultCount := 0
-	m := sync.Mutex{}
+	progress := newProgress(len(proxies))
 
 	log.Infoln("Speed Test ON")
-	doneCount := 0
 
 	pool := workerpool.New(numWorker)
 	for _, p := range proxies {
 		pp := p
 		pool.Submit(func() {
-			m.Lock()
-			proxyStat, ok := ProxyStats.Find(pp)
-			m.Unlock()
-			if !ok {
-				// when proxy's Stat not exits
-				speed, err := ProxySpeedTest(pp)
-				if err == nil || speed > 0 {
-					m.Lock()
+			defer progress.inc()
+
+			// 仅在节点尚未测速时测试
+			statsLock.RLock()
+			proxyStat, exists := ProxyStats.Find(pp)
+			needTest := !exists || proxyStat.Speed == 0
+			statsLock.RUnlock()
+			if !needTest {
+				return
+			}
+
+			speed, err := ProxySpeedTest(pp)
+			if err == nil && speed > 0 {
+				statsLock.Lock()
+				if proxyStat, ok := ProxyStats.Find(pp); ok {
+					proxyStat.UpdatePSSpeed(speed)
+				} else {
 					ProxyStats = append(ProxyStats, Stat{
 						Id:    pp.Identifier(),
 						Speed: speed,
 					})
-					resultCount++
-					m.Unlock()
 				}
-			} else if proxyStat.Speed == 0 {
-				speed, err := ProxySpeedTest(pp)
-				if err == nil || speed > 0 {
-					proxyStat.UpdatePSSpeed(speed)
-					resultCount++
-				}
+				resultCount++
+				statsLock.Unlock()
 			}
-
-			doneCount++
-			progress := float64(doneCount) * 100 / float64(len(proxies))
-			fmt.Printf("\r\t[%5.1f%% DONE]", progress)
 		})
 	}
 	pool.StopWait()
-	fmt.Println()
 	log.Infoln("Speed Test Done. New speed results count: %d", resultCount)
 }
 
@@ -240,7 +122,6 @@ func SpeedTestNewWithWorkpool(proxies []proxy.Proxy, conns int) {
 func ProxySpeedTest(p proxy.Proxy) (speedResult float64, err error) {
 	// 增加测速国家白名单
 	if len(config.Config().SpeedCountryWhiteList) != 0 {
-		// log.Infoln(p.BaseInfo().Name)
 		countryOk := false
 		countries := strings.Split(config.Config().SpeedCountryWhiteList, ",")
 		for _, c := range countries {
@@ -293,11 +174,8 @@ func ProxySpeedTest(p proxy.Proxy) (speedResult float64, err error) {
 
 	// some logically unexpected error handling
 	if user == nil {
-		return -1, errors.New("fetch User Infoln failed in go routine") // 我真的不会用channel抛出err，go routine的不明原因阻塞我服了。下面的两个BUG现在都不知道原因，逻辑上不该出现的
+		return -1, errors.New("fetch User Infoln failed in go routine")
 	}
-	// if &serverList == nil {
-	// 	return -1, errors.New("unexpected error when fetching serverlist: addr of var serverlist nil")
-	// }
 	if len(serverList.Servers) == 0 {
 		return -1, errors.New("unexpected error when fetching serverlist: unexpected 0 server")
 	}
@@ -327,8 +205,6 @@ func ProxySpeedTest(p proxy.Proxy) (speedResult float64, err error) {
 /* Test with SpeedTest.net */
 // Download Size(MB)  0.245 0.5 1.125  2   5     8     12.5  18    24.5  32
 var dlSizes = [...]int{350, 500, 750, 1000, 1500, 2000, 2500, 3000, 3500, 4000}
-
-// var ulSizes = [...]int{100, 300, 500, 800, 1000, 1500, 2500, 3000, 3500, 4000} //kB
 
 func pingTest(clashProxy C.Proxy, sURL string) time.Duration {
 	pingURL := strings.Split(sURL, "/upload")[0] + "/latency.txt"

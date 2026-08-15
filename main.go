@@ -39,7 +39,7 @@ func main() {
 	}
 
 	if err := agent.Listen(agent.Options{Addr: "0.0.0.0:8848", ShutdownCleanup: true}); err != nil {
-		log.Errorln(err.Error())
+		log.Errorln("%s", err.Error())
 	}
 
 	if configFilePath == "" {

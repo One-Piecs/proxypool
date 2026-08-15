@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net"
 	"net/url"
@@ -439,8 +439,7 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 	for _, nodes := range countryNodes {
 		// 如果random为true，随机打乱节点顺序
 		if random {
-			r := rand.New(rand.NewSource(time.Now().UnixNano()))
-			r.Shuffle(len(nodes), func(i, j int) {
+			rand.Shuffle(len(nodes), func(i, j int) {
 				nodes[i], nodes[j] = nodes[j], nodes[i]
 			})
 		}
@@ -985,7 +984,7 @@ func fetchCfIpTop20() ([]string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read body failed: %w", err)
 	}
@@ -1009,7 +1008,7 @@ func fetchCfIpProvider(isp string) ([]string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read body failed: %w", err)
 	}
@@ -1083,7 +1082,7 @@ func SubNiceCfProxySub(format string, sub string, distNodeCountry string, isIPV6
 		return "", fmt.Errorf("get cf sub failed: %w", err)
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Errorln("get cfIpApi readall: %v", err)
 		return "", fmt.Errorf("get cfIpApi readall: %w", err)

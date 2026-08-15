@@ -1,7 +1,7 @@
 package getter
 
 import (
-	"io/ioutil"
+	"io"
 	"regexp"
 	"sync"
 	"time"
@@ -28,7 +28,7 @@ func (w *WebFuzzSub) Get() proxy.ProxyList {
 		return nil
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil
 	}

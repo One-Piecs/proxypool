@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gammazero/workerpool"
@@ -33,116 +31,43 @@ var (
 	maxRetries = 2
 )
 
-/*
-func CleanBadProxiesWithGrpool(proxies []proxy.Proxy) (cproxies []proxy.Proxy) {
-	// Note: Grpool实现对go并发管理的封装，主要是在数据量大时减少内存占用，不会提高效率。
-	pool := grpool.NewPool(500, 200)
-
-	c := make(chan *Stat)
-	defer close(c)
-	m := sync.Mutex{}
-
-	pool.WaitCount(len(proxies))
-	// 线程：延迟测试，测试过程通过grpool的job并发
-	go func() {
-		for _, p := range proxies {
-			pp := p // 捕获，否则job执行时是按当前的p测试的
-			pool.JobQueue <- func() {
-				defer pool.JobDone()
-				delay, err := testDelay(pp)
-				if err == nil && delay != 0 {
-					m.Lock()
-					if ps, ok := ProxyStats.Find(pp); ok {
-						ps.UpdatePSDelay(delay)
-						c <- ps
-					} else {
-						ps = &Stat{
-							Id:    pp.Identifier(),
-							Delay: delay,
-						}
-						ProxyStats = append(ProxyStats, *ps)
-						c <- ps
-					}
-					m.Unlock()
-				}
-			}
-		}
-	}()
-	done := make(chan struct{}) // 用于多线程的运行结束标识
-	defer close(done)
-
-	go func() {
-		pool.WaitAll()
-		pool.Release()
-		done <- struct{}{}
-	}()
-
-	okMap := make(map[string]struct{})
-	for { // Note: 无限循环，直到能读取到done
-		select {
-		case ps := <-c:
-			if ps.Delay > 0 {
-				okMap[ps.Id] = struct{}{}
-			}
-		case <-done:
-			cproxies = make(proxy.ProxyList, 0, 500) // 定义返回的proxylist
-			// check usable proxy
-			for i := range proxies {
-				if _, ok := okMap[proxies[i].Identifier()]; ok {
-					// cproxies = append(cproxies, p.Clone())
-					cproxies = append(cproxies, proxies[i]) // 返回对GC不友好的指针看会怎么样
-				}
-			}
-			return
-		}
-	}
-}
-*/
-
+// CleanBadProxiesWithWorkpool 对代理做延迟检测，返回可用（延迟非 0）的代理列表。
 func CleanBadProxiesWithWorkpool(proxies []proxy.Proxy) (cproxies []proxy.Proxy) {
 	pool := workerpool.New(500)
-
 	c := make(chan *Stat)
 	defer close(c)
-	m := sync.Mutex{}
 
-	var doneCount uint32
 	total := len(proxies)
-
-	fmt.Printf("\r\t%d/%d", doneCount, total)
+	progress := newProgress(total)
 
 	for _, p := range proxies {
 		pp := p
 		pool.Submit(func() {
+			defer progress.inc()
 			delay, err := testDelay(pp)
 			if err == nil && delay != 0 {
+				statsLock.Lock()
+				var ps *Stat
 				if ps, ok := ProxyStats.Find(pp); ok {
 					ps.UpdatePSDelay(delay)
-					c <- ps
 				} else {
 					ps = &Stat{
 						Id:    pp.Identifier(),
 						Delay: delay,
 					}
-					m.Lock()
 					ProxyStats = append(ProxyStats, *ps)
-					m.Unlock()
-					c <- ps
 				}
+				statsLock.Unlock()
+				c <- ps
 			}
-
-			fmt.Printf("\r\t%d/%d", atomic.AddUint32(&doneCount, 1), total)
 		})
 	}
 
-	done := make(chan struct{}) // 用于多线程的运行结束标识
+	done := make(chan struct{})
 	defer close(done)
-
 	go func() {
 		pool.StopWait()
-		done <- struct{}{}
-
-		fmt.Println()
+		close(done)
 	}()
 
 	okMap := make(map[string]struct{})
@@ -153,15 +78,13 @@ func CleanBadProxiesWithWorkpool(proxies []proxy.Proxy) (cproxies []proxy.Proxy)
 				okMap[ps.Id] = struct{}{}
 			}
 		case <-done:
-			cproxies = make(proxy.ProxyList, 0, 500) // 定义返回的proxylist
+			cproxies = make(proxy.ProxyList, 0, total)
 			// check usable proxy
 			for i := range proxies {
 				if _, ok := okMap[proxies[i].Identifier()]; ok {
-					// cproxies = append(cproxies, p.Clone())
-					cproxies = append(cproxies, proxies[i]) // 返回对GC不友好的指针看会怎么样
+					cproxies = append(cproxies, proxies[i])
 				}
 			}
-
 			return
 		}
 	}
@@ -172,8 +95,7 @@ func testDelay(p proxy.Proxy) (delay uint16, err error) {
 	pmap := make(map[string]interface{})
 	err = json.Unmarshal([]byte(p.String()), &pmap)
 	if err != nil {
-		fmt.Printf("解析代理配置失败: %v\n", err)
-		return 0, fmt.Errorf("解析代理配置失败: %v", err)
+		return 0, fmt.Errorf("解析代理配置失败: %w", err)
 	}
 
 	pmap["port"] = int(pmap["port"].(float64))
@@ -186,8 +108,7 @@ func testDelay(p proxy.Proxy) (delay uint16, err error) {
 
 	clashProxy, err := adapter.ParseProxy(pmap)
 	if err != nil {
-		fmt.Printf("创建代理实例失败: %v\n", err)
-		return 0, fmt.Errorf("创建代理实例失败: %v", err)
+		return 0, fmt.Errorf("创建代理实例失败: %w", err)
 	}
 
 	expectedStatus, _ := utils.NewUnsignedRanges[uint16]("204")
@@ -221,9 +142,8 @@ func testDelay(p proxy.Proxy) (delay uint16, err error) {
 				continue
 			}
 
-			// 记录错误并打印日志
+			// 记录错误
 			lastErr = err
-			// fmt.Printf("测试URL %s 失败: %v\n", testURL, err)
 		}
 
 		// 如果有部分成功的测试，返回平均延迟

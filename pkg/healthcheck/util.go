@@ -3,7 +3,7 @@ package healthcheck
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/netip"
@@ -46,23 +46,24 @@ func urlToMetadata(rawURL string) (addr C.Metadata, err error) {
 	return
 }
 
-func HTTPGetViaProxy(clashProxy C.Proxy, url string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
+// doViaProxy 通过 clashProxy 发起 GET 请求并返回响应体。
+func doViaProxy(clashProxy C.Proxy, method, url string, timeout time.Duration) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	addr, err := urlToMetadata(url)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	conn, err := clashProxy.DialContext(ctx, &addr) // 建立到proxy server的connection，对Proxy的类别做了自适应相当于泛型
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer conn.Close()
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req = req.WithContext(ctx)
 
@@ -80,7 +81,7 @@ func HTTPGetViaProxy(clashProxy C.Proxy, url string) error {
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 
-	client := http.Client{
+	client := &http.Client{
 		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
@@ -88,220 +89,34 @@ func HTTPGetViaProxy(clashProxy C.Proxy, url string) error {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	resp.Body.Close()
-	return nil
+	defer resp.Body.Close()
+
+	return io.ReadAll(resp.Body)
+}
+
+func HTTPGetViaProxy(clashProxy C.Proxy, url string) error {
+	_, err := doViaProxy(clashProxy, http.MethodGet, url, defaultURLTestTimeout)
+	return err
 }
 
 func HTTPHeadViaProxy(clashProxy C.Proxy, url string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
-	defer cancel()
-
-	addr, err := urlToMetadata(url)
-	if err != nil {
-		return err
-	}
-	conn, err := clashProxy.DialContext(ctx, &addr) // 建立到proxy server的connection，对Proxy的类别做了自适应相当于泛型
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	req, err := http.NewRequest(http.MethodHead, url, nil)
-	if err != nil {
-		return err
-	}
-	req = req.WithContext(ctx)
-
-	transport := &http.Transport{
-		// Note: Dial specifies the dial function for creating unencrypted TCP connections.
-		// When httpClient sets this transport, it will use the tcp/udp connection returned from
-		// function Dial instead of default tcp/udp connection. It's the key to set custom proxy for http transport
-		Dial: func(string, string) (net.Conn, error) {
-			return conn, nil
-		},
-		// from http.DefaultTransport
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-
-	client := http.Client{
-		Transport: transport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	resp.Body.Close()
-	return nil
+	_, err := doViaProxy(clashProxy, http.MethodHead, url, defaultURLTestTimeout)
+	return err
 }
 
 func HTTPGetBodyViaProxy(clashProxy C.Proxy, url string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
-	defer cancel()
-
-	addr, err := urlToMetadata(url)
-	if err != nil {
-		return nil, err
-	}
-	conn, err := clashProxy.DialContext(ctx, &addr) // 建立到proxy server的connection，对Proxy的类别做了自适应相当于泛型
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-
-	transport := &http.Transport{
-		// Note: Dial specifies the dial function for creating unencrypted TCP connections.
-		// When httpClient sets this transport, it will use the tcp/udp connection returned from
-		// function Dial instead of default tcp/udp connection. It's the key to set custom proxy for http transport
-		Dial: func(string, string) (net.Conn, error) {
-			return conn, nil
-		},
-		// from http.DefaultTransport
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-
-	client := http.Client{
-		Transport: transport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// read speedtest config file
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return body, nil
+	return doViaProxy(clashProxy, http.MethodGet, url, defaultURLTestTimeout)
 }
 
 func HTTPGetBodyViaProxyWithTime(clashProxy C.Proxy, url string, t time.Duration) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), t)
-	defer cancel()
-
-	addr, err := urlToMetadata(url)
-	if err != nil {
-		return nil, err
-	}
-	conn, err := clashProxy.DialContext(ctx, &addr) // 建立到proxy server的connection，对Proxy的类别做了自适应相当于泛型
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-
-	transport := &http.Transport{
-		// Note: Dial specifies the dial function for creating unencrypted TCP connections.
-		// When httpClient sets this transport, it will use the tcp/udp connection returned from
-		// function Dial instead of default tcp/udp connection. It's the key to set custom proxy for http transport
-		Dial: func(string, string) (net.Conn, error) {
-			return conn, nil
-		},
-		// from http.DefaultTransport
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-
-	client := http.Client{
-		Transport: transport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// read speedtest config file
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return body, nil
+	return doViaProxy(clashProxy, http.MethodGet, url, t)
 }
 
 func HTTPGetBodyForSpeedTest(clashProxy C.Proxy, url string, t time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), t)
-	defer cancel()
-
-	addr, err := urlToMetadata(url)
-	if err != nil {
-		return err
-	}
-	conn, err := clashProxy.DialContext(ctx, &addr) // 建立到proxy server的connection，对Proxy的类别做了自适应相当于泛型
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return err
-	}
-	req = req.WithContext(ctx)
-
-	transport := &http.Transport{
-		// Note: Dial specifies the dial function for creating unencrypted TCP connections.
-		// When httpClient sets this transport, it will use the tcp/udp connection returned from
-		// function Dial instead of default tcp/udp connection. It's the key to set custom proxy for http transport
-		Dial: func(string, string) (net.Conn, error) {
-			return conn, nil
-		},
-		// from http.DefaultTransport
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-
-	client := http.Client{
-		Transport: transport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// read speedtest config file
-	_, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := doViaProxy(clashProxy, http.MethodGet, url, t)
+	return err
 }
 
 func checkErrorProxies(proxies []proxy.Proxy) bool {

@@ -2,7 +2,7 @@ package getter
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"sync"
 	"time"
 
@@ -57,7 +57,7 @@ func freessrxyzFetch(link string) proxy.ProxyList {
 		return nil
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil
 	}

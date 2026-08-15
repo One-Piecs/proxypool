@@ -133,7 +133,7 @@ func (ps ProxyList) NameAddCountry() ProxyList {
 func (ps ProxyList) NameAddIndex() ProxyList {
 	num := len(ps)
 	for i := 0; i < num; i++ {
-		ps[i].SetName(fmt.Sprintf("%s_%+02v", ps[i].BaseInfo().Name, i+1))
+		ps[i].SetName(fmt.Sprintf("%s_%02d", ps[i].BaseInfo().Name, i+1))
 	}
 	return ps
 }

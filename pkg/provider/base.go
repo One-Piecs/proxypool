@@ -162,15 +162,8 @@ func (b *Base) preFilter() {
 		}
 
 		proxies = append(proxies, p)
-		// update statistic
-		if ps, ok := healthcheck.ProxyStats.Find(p); ok {
-			ps.UpdatePSCount()
-		} else {
-			healthcheck.ProxyStats = append(healthcheck.ProxyStats, healthcheck.Stat{
-				Id:       p.Identifier(),
-				ReqCount: 1,
-			})
-		}
+		// update statistic（并发安全）
+		healthcheck.IncReqCount(p)
 	exclude:
 	}
 

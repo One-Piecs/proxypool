@@ -119,7 +119,7 @@ func CrawlGo() {
 	// 中转检测并命名
 	healthcheck.RelayCheckWorkpool(proxies)
 	for i := range proxies {
-		if s, ok := healthcheck.ProxyStats.Find(proxies[i]); ok {
+		if s, ok := healthcheck.FindStat(proxies[i]); ok {
 			if s.Relay {
 				_, c, e := geoIp.GeoIpDB.Find(s.OutIp)
 				if e == nil {
@@ -146,7 +146,7 @@ func CrawlGo() {
 	// 检测是否支持ChatGPT
 	healthcheck.CheckWorkpool(proxies)
 	for i := range proxies {
-		if s, ok := healthcheck.ProxyStats.Find(proxies[i]); ok {
+		if s, ok := healthcheck.FindStat(proxies[i]); ok {
 			if s.ChatGPT {
 				proxies[i].SetName(fmt.Sprintf("ChatGPT %s", proxies[i].BaseInfo().Name))
 			}

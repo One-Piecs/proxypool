@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/One-Piecs/proxypool/pkg/tool"
-	"github.com/ghodss/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 func TestSSLink(t *testing.T) {

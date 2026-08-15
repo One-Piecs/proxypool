@@ -2,13 +2,13 @@ package config
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 	"sync/atomic"
 
 	"github.com/One-Piecs/proxypool/pkg/tool"
-	"github.com/ghodss/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 var configFilePath = "config.yaml"
@@ -129,11 +129,10 @@ func ReadFile(path string) ([]byte, error) {
 			return nil, errors.New("config file http get fail")
 		}
 		defer resp.Body.Close()
-		return ioutil.ReadAll(resp.Body)
-	} else {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			return nil, err
-		}
-		return ioutil.ReadFile(path)
+		return io.ReadAll(resp.Body)
 	}
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, err
+	}
+	return os.ReadFile(path)
 }

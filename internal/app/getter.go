@@ -7,10 +7,9 @@ import (
 
 	"github.com/One-Piecs/proxypool/internal/cache"
 
-	"github.com/ghodss/yaml"
-
 	"github.com/One-Piecs/proxypool/config"
 	"github.com/One-Piecs/proxypool/pkg/getter"
+	"gopkg.in/yaml.v3"
 )
 
 var Getters = make([]getter.Getter, 0)

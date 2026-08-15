@@ -1,6 +1,43 @@
 package healthcheck
 
-import "github.com/One-Piecs/proxypool/pkg/proxy"
+import (
+	"sort"
+	"sync"
+
+	"github.com/One-Piecs/proxypool/pkg/proxy"
+)
+
+// statsLock 保护全局 ProxyStats 的并发访问：
+// 爬取管道（延迟/测速/中转/ChatGPT 检测）与 HTTP 请求（provider.preFilter）会并发读写。
+var statsLock sync.RWMutex
+
+// FindStat 并发安全地查找代理统计
+func FindStat(p proxy.Proxy) (*Stat, bool) {
+	statsLock.RLock()
+	defer statsLock.RUnlock()
+	return ProxyStats.Find(p)
+}
+
+// AppendStat 并发安全地追加代理统计
+func AppendStat(s Stat) {
+	statsLock.Lock()
+	ProxyStats = append(ProxyStats, s)
+	statsLock.Unlock()
+}
+
+// IncReqCount 并发安全地对代理的请求计数 +1，不存在则新建一条统计。
+func IncReqCount(p proxy.Proxy) {
+	statsLock.Lock()
+	if ps, ok := ProxyStats.Find(p); ok {
+		ps.ReqCount++
+	} else {
+		ProxyStats = append(ProxyStats, Stat{
+			Id:       p.Identifier(),
+			ReqCount: 1,
+		})
+	}
+	statsLock.Unlock()
+}
 
 // Statistic for a proxy
 type Stat struct {
@@ -61,24 +98,37 @@ func (psList StatList) Find(p proxy.Proxy) (*Stat, bool) {
 
 // Return proxies that request count more than a given nubmer
 func (psList StatList) ReqCountThan(n uint16, pl []proxy.Proxy, reset bool) []proxy.Proxy {
-	proxies := make([]proxy.Proxy, 0)
+	statsLock.RLock()
+	// 先构建 Id → 请求次数 的索引，将 O(n*m) 降为 O(n+m)
+	countMap := make(map[string]uint16, len(psList))
+	for j := range psList {
+		countMap[psList[j].Id] = psList[j].ReqCount
+	}
+	statsLock.RUnlock()
+
+	proxies := make([]proxy.Proxy, 0, len(pl))
 	for _, p := range pl {
-		for j := range psList {
-			if psList[j].ReqCount > n && p.Identifier() == psList[j].Id {
-				proxies = append(proxies, p)
-			}
+		if p == nil {
+			continue
+		}
+		if countMap[p.Identifier()] > n {
+			proxies = append(proxies, p)
 		}
 	}
+
 	// reset request count
 	if reset {
+		statsLock.Lock()
 		for i := range psList {
 			psList[i].ReqCount = 0
 		}
+		statsLock.Unlock()
 	}
 	return proxies
 }
 
 // Sort proxies by speed. Notice that this returns the same pointer.
+// 使用稳定的 sort.SliceStable 替代手写冒泡排序，将 O(n^2) 降为 O(n log n)。
 func (psList StatList) SortProxiesBySpeed(proxies []proxy.Proxy) []proxy.Proxy {
 	if ok := checkErrorProxies(proxies); !ok {
 		return proxies
@@ -87,44 +137,29 @@ func (psList StatList) SortProxiesBySpeed(proxies []proxy.Proxy) []proxy.Proxy {
 	if l == 1 {
 		return proxies
 	}
-	// Classic bubble Sort. Biggest the first
-	for i := 0; i < l-1; i++ { // i defines unsorted list bound
-		flag := false
-		for j := 0; j < l-1-i; j++ {
-			ps1, ok1 := psList.Find(proxies[j])
-			ps2, ok2 := psList.Find(proxies[j+1])
-			// validate records, put no record proxy behind
-			if !ok2 {
-				continue
-			} else if !ok1 && ok2 {
-				t := proxies[j]
-				proxies[j] = proxies[j+1]
-				proxies[j+1] = t
-				flag = true
-				continue
-			}
-			// else: validate speed value, put zero speed proxy behind
-			if ps2.Speed == 0 {
-				continue
-			} else if ps1.Speed == 0 { // when ps2.speed != 0, validate ps1
-				t := proxies[j]
-				proxies[j] = proxies[j+1]
-				proxies[j+1] = t
-				flag = true
-				continue
-			} else {
-				// Reach the real speed sort. Too much code on validation. I'm so tired
-				if ps1.Speed < ps2.Speed {
-					t := proxies[j]
-					proxies[j] = proxies[j+1]
-					proxies[j+1] = t
-					flag = true
-				}
-			}
-		}
-		if !flag {
-			break
+
+	statsLock.RLock()
+	// 预取每个代理的速度记录，避免在比较器中反复线性查找
+	speedMap := make(map[string]float64, l)
+	for _, p := range proxies {
+		if ps, ok := psList.Find(p); ok {
+			speedMap[p.Identifier()] = ps.Speed
 		}
 	}
+	statsLock.RUnlock()
+
+	// 排序规则：有测速记录的排前面（速度从大到小），无记录的排后面
+	sort.SliceStable(proxies, func(i, j int) bool {
+		si, oki := speedMap[proxies[i].Identifier()]
+		sj, okj := speedMap[proxies[j].Identifier()]
+		switch {
+		case oki && okj:
+			return si > sj
+		case oki:
+			return true
+		default:
+			return false
+		}
+	})
 	return proxies
 }

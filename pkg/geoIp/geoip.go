@@ -3,7 +3,7 @@ package geoIp
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -109,7 +109,7 @@ func NewGeoIP(geodb, flags string) (geoip GeoIP) {
 		}
 
 	} else {
-		flagsData, err = ioutil.ReadFile(flags)
+		flagsData, err = os.ReadFile(flags)
 		if err != nil {
 			panic(err)
 		}
@@ -154,7 +154,7 @@ func GeoIpBinary(url string) (data []byte, err error) {
 	}
 
 	// Read Response Body
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }
 
 func GeoIpVersion(url string) (version string, err error) {
@@ -181,7 +181,7 @@ func GeoIpVersion(url string) (version string, err error) {
 	}
 
 	// Read Response Body
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -270,7 +270,7 @@ func FindFromIPAPI(ip string) (countryCode string, err error) {
 		return "", fmt.Errorf("ip-api.com status: %d", resp.StatusCode)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -305,9 +305,9 @@ func UpdateGeoIpASNDB() {
 	} else {
 		defer resp.Body.Close()
 		if resp.StatusCode == http.StatusOK {
-			data, err := ioutil.ReadAll(resp.Body)
+			data, err := io.ReadAll(resp.Body)
 			if err == nil {
-				if err := ioutil.WriteFile(dbPath, data, 0644); err == nil {
+				if err := os.WriteFile(dbPath, data, 0644); err == nil {
 					log.Infoln("ASN DB downloaded and updated successfully")
 
 					// Reload DB

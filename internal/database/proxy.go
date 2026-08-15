@@ -9,6 +9,7 @@ import (
 	"github.com/One-Piecs/proxypool/log"
 	"github.com/One-Piecs/proxypool/pkg/proxy"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // 设置数据库字段，表名为默认为type名的复数。相比于原作者，不使用软删除特性
@@ -37,17 +38,22 @@ func InitTables() {
 	}
 }
 
+// SaveProxyList 批量保存可用代理列表。
+// 使用 clause.OnConflict 在唯一索引冲突时更新 useable/name/country，
+// 替代原先逐条 Create+Update 的循环，显著减少 SQL 往返。
 func SaveProxyList(pl proxy.ProxyList) {
-	if DB == nil {
+	if DB == nil || pl.Len() == 0 {
 		return
 	}
 
 	_ = DB.Transaction(func(tx *gorm.DB) error {
 		// Set All Usable to false
-		if err := DB.Model(&Proxy{}).Where("useable = ?", true).Update("useable", "false").Error; err != nil {
+		if err := tx.Model(&Proxy{}).Where("useable = ?", true).Update("useable", false).Error; err != nil {
 			log.Warnln("database: Reset useable to false failed: %s", err.Error())
 		}
-		// Create or Update proxies
+
+		// 批量 Create or Update proxies
+		records := make([]Proxy, 0, pl.Len())
 		for i := 0; i < pl.Len(); i++ {
 			p := Proxy{
 				Base:       *pl[i].BaseInfo(),
@@ -55,18 +61,17 @@ func SaveProxyList(pl proxy.ProxyList) {
 				Identifier: pl[i].Identifier(),
 			}
 			p.Useable = true
-			if err := DB.Create(&p).Error; err != nil {
-				// Update with Identifier
-				if uperr := DB.Model(&Proxy{}).Where("identifier = ?", p.Identifier).Updates(&Proxy{
-					Base: proxy.Base{Useable: true, Name: p.Name, Country: p.Country},
-				}).Error; uperr != nil {
-					log.Warnln("\n\t\tdatabase: Update failed:"+
-						"\n\t\tdatabase: When Created item: %s"+
-						"\n\t\tdatabase: When Updated item: %s", err.Error(), uperr.Error())
-				}
-			}
+			records = append(records, p)
 		}
-		log.Infoln("database: Updated")
+
+		// 以 identifier 为唯一键做 upsert：冲突时更新 useable/name/country/link
+		if err := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "identifier"}},
+			DoUpdates: clause.AssignmentColumns([]string{"useable", "name", "country", "link", "updated_at"}),
+		}).CreateInBatches(records, 500).Error; err != nil {
+			log.Warnln("database: Batch upsert failed: %s", err.Error())
+		}
+		log.Infoln("database: Updated %d proxies", len(records))
 		return nil
 	})
 }
@@ -83,6 +88,7 @@ func GetAllProxies() (proxies proxy.ProxyList) {
 
 	wp := workerpool.New(100)
 	m := sync.Mutex{}
+	proxies = make(proxy.ProxyList, 0, len(proxiesDB))
 
 	for _, proxyDB := range proxiesDB {
 		pDB := proxyDB
@@ -106,15 +112,15 @@ func ClearOldItems() {
 		return
 	}
 	lastWeek := time.Now().Add(-time.Hour * 24 * 7)
-	if err := DB.Where("updated_at < ? AND useable = ?", lastWeek, false).Delete(&Proxy{}); err != nil {
-		var count int64
-		DB.Model(&Proxy{}).Where("updated_at < ? AND useable = ?", lastWeek, false).Count(&count)
-		if count == 0 {
-			log.Infoln("database: Nothing old to sweep") // TODO always this line?
-		} else {
-			log.Warnln("database: Delete old item failed: %s", err.Error.Error())
-		}
+	// gorm 的 Delete 返回 *gorm.DB，用 .Error 判断执行是否成功
+	res := DB.Where("updated_at < ? AND useable = ?", lastWeek, false).Delete(&Proxy{})
+	if res.Error != nil {
+		log.Warnln("database: Delete old item failed: %s", res.Error.Error())
+		return
+	}
+	if res.RowsAffected > 0 {
+		log.Infoln("database: Swept %d old and unusable proxies", res.RowsAffected)
 	} else {
-		log.Infoln("database: Swept old and unusable proxies")
+		log.Infoln("database: Nothing old to sweep")
 	}
 }
