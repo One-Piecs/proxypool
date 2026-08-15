@@ -42,6 +42,8 @@ func checkLoonSupport(p proxy.Proxy) bool {
 		}
 	case *proxy.Trojan:
 		return true
+	case *proxy.Vless:
+		return true
 	default:
 		return false
 	}

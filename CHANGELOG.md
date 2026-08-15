@@ -5,6 +5,17 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.35] - 2026-08-16
+
+### 🐛 修复 /loon|/surge/proxies 的 vless 输出为空
+
+- v1.1.31 新增 vless 时漏改 `checkLoonSupport` / `checkSurgeSupport`：
+  两个校验函数没有 vless 分支，导致 vless 节点被 Loon / Surge 输出排除，
+  `/loon/proxies?type=vless`、`/surge/proxies?type=vless` 返回空
+- 修复：两个校验函数补充 `case *proxy.Vless: return true`
+  （vless 类型自身已有 ToLoon / ToSurge 实现）
+- 新增回归测试：`TestVlessSupport` 覆盖 clash/loon/surge/quanx 四个校验函数
+
 ## [v1.1.34] - 2026-08-16
 
 ### 🐛 静默 mihomo 内部日志噪音
