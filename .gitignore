@@ -29,5 +29,10 @@ config/assets/html/*
 config/assets/css/*
 config/assets/static/*
 
+# 运行时下载的 GeoIP 数据库(首次启动自动下载到本地缓存)
+assets/*.mmdb
+assets/version
+assets/flags.json
+
 proxypool*
 config/*

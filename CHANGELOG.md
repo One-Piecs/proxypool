@@ -5,6 +5,25 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.21] - 2026-08-16
+
+### ⚡ GeoIP 数据库处理优化
+
+- **本地持久化**：Country.mmdb 下载后落盘 + 版本号写入 `assets/version`，
+  重启直接本地加载（秒开），不再每次启动重复下载 40MB 到内存
+- **修复版本追踪 bug**：原实现本地文件模式版本号为空，cron 的 `UpdateGeoIP` 永远跳过更新检查；
+  现每次启动读取本地版本，每日 cron 与远程比对，有更新才下载
+- **修复并发竞态**：`UpdateGeoIP`/`UpdateGeoIpASNDB` 原实现直接替换 `GeoIpDB.db` 并立即
+  Close 旧 reader，与进行中的 `Find`/`GetASN` 冲突；改用 `atomic.Pointer` 原子替换 + 延迟关闭
+- **下载超时**：原裸 `http.Client{}` 无超时、失败即 panic；现统一 30s/10s 超时客户端，失败返回错误
+- **修复 ASN 库下载源**：`git.io` 短链已被 GitHub 停用且不稳定，改用 GitHub Release 直连地址
+- **启动不再强制下载 ASN 库**：本地已有则直接加载，仅缺失时才下载
+- **ip-api.com fallback 防限流**：加 TTL 缓存（成功 24h / 失败 5min）+ 串行化查询 + 5s 超时，
+  避免代理池大量查询触发 429
+- **`Find` 微优化**：纯 IP 入参直接解析跳过 DNS 查询；国家名拼接用字符串连接替代 `fmt.Sprintf`
+- `IsCDN` 关键词表大写预编译；删除死代码 `ReInitGeoIpDB`/`GeoIpBinary`/`GeoIpVersion`
+- 新增 5 个单元测试（emoji 映射 / 原子写文件 / 无库容错 / 非法输入 / 关键词覆盖）
+
 ## [v1.1.20] - 2026-08-16
 
 ### 🔒 安全修复
