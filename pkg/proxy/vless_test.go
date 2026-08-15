@@ -143,7 +143,7 @@ func TestToQuanX(t *testing.T) {
 				t.Errorf("trojan prefix: %s", out)
 			}
 		case "vless":
-			if !strings.HasPrefix(out, "vless = ") {
+			if !strings.HasPrefix(out, "vless=") {
 				t.Errorf("vless prefix: %s", out)
 			}
 		}
@@ -227,7 +227,7 @@ func TestVlessRealityOutput(t *testing.T) {
 	loon := v.ToLoon()
 	for _, want := range []string{"VLESS", "transport=tcp", "flow=xtls-rprx-vision",
 		`public-key="LgJ9bNTyUqBLFkDA12-QgEL7c1yQ1ztk-V1Q-3OLXSk"`, "short-id=164168844958a16d",
-		"over-tls=true", "sni=www.apple.com", "udp=true"} {
+		"over-tls=true", "tls-name=www.apple.com", "udp=true"} {
 		if !strings.Contains(loon, want) {
 			t.Errorf("ToLoon missing %q:\n%s", want, loon)
 		}
@@ -235,7 +235,7 @@ func TestVlessRealityOutput(t *testing.T) {
 
 	// QuanX: reality-base64-pubkey / reality-hex-shortid / vless-flow
 	quanx := v.ToQuanX()
-	for _, want := range []string{"vless = ", "reality-base64-pubkey=LgJ9bNTyUqBLFkDA12-QgEL7c1yQ1ztk-V1Q-3OLXSk",
+	for _, want := range []string{"vless=", "reality-base64-pubkey=LgJ9bNTyUqBLFkDA12-QgEL7c1yQ1ztk-V1Q-3OLXSk",
 		"reality-hex-shortid=164168844958a16d", "vless-flow=xtls-rprx-vision", "obfs=over-tls"} {
 		if !strings.Contains(quanx, want) {
 			t.Errorf("ToQuanX missing %q:\n%s", want, quanx)

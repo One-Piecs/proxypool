@@ -340,6 +340,19 @@
 - 移除已替换依赖在 `go.mod` / `go.sum` 中的条目
 - 变更规模：28 个文件，+701 / -1270 行（净减约 570 行）
 
+## [v1.1.40] - 2026-08-16
+
+### 🐛 按官方示例最终校准 Loon / QuanX 的 vless 格式
+
+- **Loon**（官方 example.conf）：`tls-name=` 替代 `sni=`（官方 vless 示例用 tls-name），
+  其余已匹配（VLESS 大写 / transport= / over-tls= / skip-cert-verify）
+- **QuanX**（官方示例 quanx.txt）：
+  - `vless=host:port` 去除多余空格（官方无空格）
+  - 修复 ws+tls 节点 `obfs` 重复（官方：ws→obfs=wss、tcp+tls→obfs=over-tls，仅设一次）
+  - reality 参数独立于传输输出（官方 ws 示例也带 reality-base64-pubkey）
+  - 普通 tls 默认 tls-verification，skip-cert-verify 时输出 tls-verification=false
+- 测试断言同步更新；修正测试缓存导致的误判（-count=1 强制重跑）
+
 ## [v1.1.39] - 2026-08-16
 
 ### 🐛 按客户端官方格式修正 Loon / QuanX 的 Reality 输出

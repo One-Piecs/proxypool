@@ -61,12 +61,13 @@ func (v Vless) ToQuanX() string {
 	if host == "" {
 		host = v.ServerName
 	}
-	text := fmt.Sprintf(`vless = %s:%d, method=none, password=%s, udp-relay=true, tag=%s`,
+	text := fmt.Sprintf(`vless=%s:%d, method=none, password=%s, udp-relay=true, tag=%s`,
 		v.Server, v.Port, v.UUID, v.Name)
 	network := v.Network
 	if network == "" {
 		network = "tcp"
 	}
+	// obfs 仅按传输设置一次（官方示例：ws→wss、tcp+tls→over-tls），避免重复
 	switch network {
 	case "ws":
 		path := v.WSPath
@@ -79,24 +80,23 @@ func (v Vless) ToQuanX() string {
 		if v.GrpcServiceName != "" {
 			text += ", grpc-service-name=" + v.GrpcServiceName
 		}
+	default: // tcp
+		if v.TLS {
+			obfsHost := v.ServerName
+			if obfsHost == "" {
+				obfsHost = v.Server
+			}
+			text += fmt.Sprintf(", obfs=over-tls, obfs-host=%s", obfsHost)
+			if v.SkipCertVerify {
+				text += ", tls-verification=false"
+			}
+		}
 	}
-	if v.TLS {
-		if v.RealityPublicKey != "" {
-			// Reality：over-tls + 公钥 + short-id + flow
-			sni := v.ServerName
-			if sni == "" {
-				sni = v.Server
-			}
-			text += fmt.Sprintf(", obfs=over-tls, obfs-host=%s, reality-base64-pubkey=%s", sni, v.RealityPublicKey)
-			if v.RealityShortID != "" {
-				text += ", reality-hex-shortid=" + v.RealityShortID
-			}
-		} else {
-			// 普通 tls
-			if host == "" {
-				host = v.Server
-			}
-			text += fmt.Sprintf(", obfs=over-tls, obfs-host=%s, tls-verification=%v", host, !v.SkipCertVerify)
+	// Reality 参数独立于传输（官方示例 ws 也带 reality-base64-pubkey）
+	if v.RealityPublicKey != "" {
+		text += ", reality-base64-pubkey=" + v.RealityPublicKey
+		if v.RealityShortID != "" {
+			text += ", reality-hex-shortid=" + v.RealityShortID
 		}
 	}
 	if v.Flow != "" {
@@ -253,11 +253,12 @@ func (v Vless) ToLoon() string {
 	}
 	if v.TLS {
 		text += ", over-tls=true"
-		sni := v.ServerName
-		if sni == "" {
-			sni = v.Server
+		// 官方 example.conf 用 tls-name（非 sni）
+		tlsName := v.ServerName
+		if tlsName == "" {
+			tlsName = v.Server
 		}
-		text += ", sni=" + sni
+		text += ", tls-name=" + tlsName
 		if v.SkipCertVerify {
 			text += ", skip-cert-verify=true"
 		}
