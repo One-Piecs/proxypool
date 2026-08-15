@@ -5,6 +5,19 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.30] - 2026-08-16
+
+### 🐛 修复健康检查 done 通道二次关闭 panic
+
+- `CleanBadProxiesWithWorkpool`：`done` 通道既被 goroutine `close(done)`
+  （StopWait 完成后）又被 `defer close(done)` 关闭，健康检查正常完成、
+  循环经 done 分支返回时触发 `close of closed channel` panic
+- 之前未暴露的原因：v1.1.26 修复前的 nil 指针 bug 先 panic，掩盖了此问题；
+  nil 修复后健康检查能完整跑完（9426/9426），二次关闭立即暴露
+- 修复：移除 `defer close(done)`，done 仅由 goroutine 单一关闭
+- 新增空列表回归测试：空列表不提交任务，StopWait 立即返回并 close(done)，
+  旧实现必然二次关闭 panic（无需网络即可复现）
+
 ## [v1.1.29] - 2026-08-16
 
 ### 🐛 修复测速任务未重读配置（回归）

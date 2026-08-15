@@ -42,3 +42,13 @@ func TestFindOrCreateDelayStat(t *testing.T) {
 		t.Fatalf("ProxyStats len = %d, want 1 (no duplicate)", len(ProxyStats))
 	}
 }
+
+// TestCleanBadProxiesEmptyList 回归验证 done 通道不被二次关闭：
+// 空列表不提交任务，StopWait 立即返回并 close(done)，
+// 旧实现还保留 defer close(done) 导致函数返回时二次关闭 panic。
+func TestCleanBadProxiesEmptyList(t *testing.T) {
+	result := CleanBadProxiesWithWorkpool(nil)
+	if result == nil || len(result) != 0 {
+		t.Fatalf("expected empty result, got len=%d", len(result))
+	}
+}

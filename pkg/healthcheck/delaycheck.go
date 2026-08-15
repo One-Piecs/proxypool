@@ -54,7 +54,8 @@ func CleanBadProxiesWithWorkpool(proxies []proxy.Proxy) (cproxies []proxy.Proxy)
 	}
 
 	done := make(chan struct{})
-	defer close(done)
+	// 注意：done 仅由下面的 goroutine 关闭（StopWait 完成后），
+	// 不能再用 defer close(done)，否则循环退出后二次关闭会 panic
 	go func() {
 		pool.StopWait()
 		close(done)
