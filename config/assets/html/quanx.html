@@ -44,32 +44,21 @@
     <!-- Body -->
     <div class="container">
         <div class="section pb-0">
-            <h1 class="title is-2"><i class="metron-shadowrocket"></i>&nbspShadowRocket</h1>
+            <h1 class="title is-2"><i class="metron-quanx"></i>&nbspQuanX</h1>
         </div>
-        <section class="section">
-            <h5 class="title is-4">节点列表</h5>
-            <div class="table-container">
-                <div class="table-container">
-                    <table class="table is-fullwidth">
-                        <tbody>
-                            <tr>
-                                <th>全部节点订阅</th>
-                                <td>https://{{ .domain }}/clash/proxies</td>
-                                <td class="has-text-right"><button class="button is-small is-primary" onclick="onCopy(this)">复制</button></td>
-                            </tr>
-                            <tr><th>常用国家订阅</th>
-                                <td>https://{{ .domain }}/clash/proxies?c=CN,HK,TW,JP,US</td>
-                                <td class="has-text-right"><button class="button is-small is-primary" onclick="onCopy(this)">复制</button></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+        <section class='section'>
+            <h5 class="title is-4 mt-3">节点列表</h5>
+            <div class="table-container mt-2">
+                <table class="table is-fullwidth">
+                    <tbody>
+                        <tr>
+                            <th>QuanX节点</th>
+                            <td>https://{{ .domain }}/quanx/proxies</td>
+                            <td class="has-text-right"><button class="button is-small is-primary" onclick="onCopy(this)">复制</button></td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
-            <article class="message is-info">
-                <div class="message-body">
-                    ShadowRocket的订阅包含了Clash格式，可以参考<a href="./clash">Clash</a>进行筛选。
-                </div>
-            </article>
         </section>
     </div>
     <footer class="footer has-text-centered">

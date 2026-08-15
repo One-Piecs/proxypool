@@ -339,3 +339,19 @@
 - 废弃 API 替换：`ioutil.ReadAll` / `ReadFile` / `WriteFile` → `io.ReadAll` / `os.ReadFile` / `os.WriteFile`
 - 移除已替换依赖在 `go.mod` / `go.sum` 中的条目
 - 变更规模：28 个文件，+701 / -1270 行（净减约 570 行）
+
+## [v1.1.36] - 2026-08-16
+
+### 🐛 紧急修复：v1.1.33 破坏全部 HTML 页面
+
+- v1.1.33 用正则脚本批量改导航栏时，`src = group(1) + nav_new + group(3)`
+  先把文件覆盖成导航栏碎片，又执行了一次正则替换，导致 **6 个页面全部被压成
+  9 行坏文件**（index/clash/surge/shadowrocket 在 v1.1.33 被提交为坏版本；
+  loon/quanx 因 .gitignore 的 `config/*` 规则从未入库）
+- 修复：从 v1.1.32 恢复 4 个页面（保留 vless 相关修改），用**精确字符串替换**
+  重新加入 Loon/QuanX 导航，重新生成 loon.html / quanx.html
+- 修复 .gitignore：`config/*` 宽泛规则改为明确忽略 yaml/crt/key/ini，
+  放行 `config/assets/html/*.html` 与 `static/index.js`（页面模板必须入库），
+  补回 `proxypool*`、`data`、mmdb 忽略
+- 验证：6 个页面全部 200 渲染、结构完整（doctype/html/nav/footer 齐全）、
+  导航含 Loon/QuanX

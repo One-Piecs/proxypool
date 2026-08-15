@@ -23,16 +23,29 @@ vendor
 # macOS file
 .DS_Store
 
-# assets
+# 运行时配置文件与密钥（不入库）
+config/*.yaml
+config/*.yml
+config/*.crt
+config/*.key
+config/*.ini
+config/N1/
+!config/*.go
+
+# 前端资源：页面模板与 static/index.js 必须入库（! 规则覆盖上面的忽略）
 config/assets/html/*
+!config/assets/html/*.html
 config/assets/css/*
 config/assets/static/*
+!config/assets/static/index.js
 
 # 运行时下载的 GeoIP 数据库(首次启动自动下载到本地缓存)
 assets/*.mmdb
 assets/version
 assets/flags.json
+config/assets/Country.mmdb
+config/assets/flags.json
 
+# 根目录编译产物与运行时数据
 proxypool*
-config/*
-!config/*.go
+data
