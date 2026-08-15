@@ -5,6 +5,25 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.24] - 2026-08-16
+
+### ⚡ internal/app 优化
+
+- **5 份重复的 URL 生成器 15 分支 switch 收敛**：`generatorKey(f)` + 两张生成器表
+  （6 参 / 7 参），原先每个 SubNice* 函数各内联一份
+- **`SubNiceCfProxyIp` / `SubNiceCfProxyIpTop20` / `SubNiceCfProxyIpProvider`
+  收敛为薄封装**：共用 `buildNodeOutput`，每个由 ~110 行缩至 ~25 行
+- **公共逻辑提取**：`loadProxyInfo`（5 份 copier.Copy）、`writeOutputHeader`（5 份头部）、
+  `finishOutput`（4 份 V2rayn base64）、`trackDuration`（5 份 defer 计时）
+- **`CrawlBestNode`**：`resty.New()` 每请求创建 → 包级共享客户端（含 TLS 跳过校验/UA/超时）；
+  三处手写补端口 → `normalizeAddr`（顺带修复裸 IPv6 无方括号的隐患）；
+  两处手写 host:port 拆分 → `splitHostPort`（net.SplitHostPort 正确支持 IPv6）
+- **`CfIpProvider` 去重**：4 个相同匿名 struct + fetchCfIpProvider 中重复的 1 份 → 命名类型 `cfIpItem`
+- **单次遍历统计类型数量**：新增 `ProxyList.TypeCounts()`，替代 8 次 `TypeLen` 的 O(8n) 扫描
+- **`CrawlGo` 末尾复用 `RefreshProviderCache`**，删除内联的三份 provider 刷新
+- 删除死代码 `removeDuplicateElement`、`filterIpCountry`
+- `internal/app` 净减约 620 行（1696 → 1159 行的核心文件）
+
 ## [v1.1.23] - 2026-08-16
 
 ### ⚡ API 路由与配置加载优化

@@ -3,7 +3,6 @@ package app
 import (
 	"bufio"
 	"bytes"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -25,8 +24,6 @@ import (
 	"github.com/One-Piecs/proxypool/pkg/geoIp"
 	"github.com/One-Piecs/proxypool/pkg/tool"
 	"github.com/gammazero/workerpool"
-	"github.com/go-resty/resty/v2"
-	"github.com/jinzhu/copier"
 )
 
 type Format struct {
@@ -59,7 +56,7 @@ func CrawlBestNode() {
 				log.Infoln("Starting Sub URL: %s", _url)
 
 				for retries := 0; retries < 3; retries++ {
-					resp, err := resty.New().SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true}).R().
+					resp, err := bestNodeClient.R().
 						SetQueryParams(map[string]string{
 							"host":       "p.laibbb.top",
 							"uuid":       "e4e08238-e42c-4288-8f67-e2994ec18c90",
@@ -67,7 +64,6 @@ func CrawlBestNode() {
 							"path":       "/webhook",
 							"edgetunnel": "cmliu",
 						}).
-						SetHeader("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36").
 						Get(_url)
 					if err != nil {
 						log.Errorln("resty.Get(): %s, retry: %d", err.Error(), retries)
@@ -113,11 +109,7 @@ func CrawlBestNode() {
 				// SubNiceCfProxyIp passes 443. Let's append default port if missing.
 				// However ExtractHostPort might expect port.
 				// Let's manually store with :443 if standard IP
-				if !strings.Contains(ip, ":") {
-					addrMap.Store(net.JoinHostPort(ip, "443"), struct{}{})
-				} else {
-					addrMap.Store(ip, struct{}{})
-				}
+				addrMap.Store(normalizeAddr(ip), struct{}{})
 			}
 		}
 	})
@@ -134,11 +126,7 @@ func CrawlBestNode() {
 		}
 		log.Infoln("Got %d IPs from Top 20", len(ips))
 		for _, ip := range ips {
-			if !strings.Contains(ip, ":") {
-				addrMap.Store(net.JoinHostPort(ip, "443"), struct{}{})
-			} else {
-				addrMap.Store(ip, struct{}{})
-			}
+			addrMap.Store(normalizeAddr(ip), struct{}{})
 		}
 	})
 
@@ -157,11 +145,7 @@ func CrawlBestNode() {
 			}
 			log.Infoln("Got %d IPs for %s", len(ips), isp)
 			for _, ip := range ips {
-				if !strings.Contains(ip, ":") {
-					addrMap.Store(net.JoinHostPort(ip, "443"), struct{}{})
-				} else {
-					addrMap.Store(ip, struct{}{})
-				}
+				addrMap.Store(normalizeAddr(ip), struct{}{})
 			}
 		}
 	})
@@ -216,18 +200,8 @@ func CrawlBestNode() {
 		// For simplicity, let's just do a quick parse or rely on the below loop.
 		// But we want to do batch check BEFORE worker pool starts.
 
-		ip := ""
-		h := strings.Split(addr, "]:")
-		if len(h) == 2 {
-			ip = strings.ReplaceAll(h[0], "[", "")
-		} else {
-			h := strings.Split(addr, ":")
-			if len(h) == 2 {
-				ip = h[0]
-			}
-		}
-
-		if ip != "" {
+		ip, _, err := splitHostPort(addr)
+		if err == nil && ip != "" {
 			// Priority 1: Check IP Ranges (Fastest, Local)
 			if cdn.GlobalManager.IsCDN(ip) {
 				cdnMap[ip] = true
@@ -266,31 +240,10 @@ func CrawlBestNode() {
 	for _, addr := range addrAll {
 		addr := addr // 创建副本
 		wp.Submit(func() {
-			var err error
-			ip := ""
-			port := 0
-			h := strings.Split(addr, "]:")
-			if len(h) == 2 {
-				// ipv6
-				ip = strings.ReplaceAll(h[0], "[", "")
-				port, err = strconv.Atoi(h[1])
-				if err != nil {
-					log.Errorln("strconv.Atoi(h[1]): %s", err.Error())
-					return
-				}
-			} else {
-				// ipv4
-				h := strings.Split(addr, ":")
-				if len(h) != 2 {
-					log.Errorln("invalid addr: %s", addr)
-					return
-				}
-				ip = h[0]
-				port, err = strconv.Atoi(h[1])
-				if err != nil {
-					log.Errorln("strconv.Atoi(h[1]): %s", err.Error())
-					return
-				}
+			ip, port, err := splitHostPort(addr)
+			if err != nil {
+				log.Errorln("invalid addr: %s: %v", addr, err)
+				return
 			}
 
 			// if ip == "cf.090227.xyz" {
@@ -351,11 +304,7 @@ func CrawlBestNode() {
 }
 
 func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode string, limit int, random bool, isIPV6 bool, cdnFilter string) (s string, err error) {
-	// 使用defer来记录函数执行时间
-	start := time.Now()
-	defer func() {
-		log.Infoln("SubNiceProxyIp completed in %v", time.Since(start))
-	}()
+	defer trackDuration("SubNiceProxyIp")()
 
 	// 检查格式并获取配置
 	f, err := checkFormat(format, distNodeCountry)
@@ -375,13 +324,7 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 	buf := strings.Builder{}
 	buf.Grow(len(bestNodeList) * 200) // 预估每个节点约200字节
 
-	// 写入头部信息
-	if !f.V2rayn {
-		buf.WriteString("# " + cache.GetString("bestNodeLastUpdateTime") + "\n")
-		if f.Clash {
-			buf.WriteString("proxies:\n")
-		}
-	}
+	writeOutputHeader(&buf, f, cache.GetString("bestNodeLastUpdateTime"))
 	// 优化国家代码过滤
 	var countryFilter map[string]struct{}
 	if proxyCountryIsoCode != "" {
@@ -392,29 +335,11 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 	}
 
 	// 复制代理信息以避免并发问题
-	var proxyInfo config.ProxyInfo
-	if err := copier.Copy(&proxyInfo, &config.Config().ProxyInfo); err != nil {
-		log.Errorln("Failed to copy proxy info: %v", err)
-		return "", fmt.Errorf("proxy info copy error: %w", err)
+	proxyInfo, err := loadProxyInfo()
+	if err != nil {
+		return "", err
 	}
-
-	// 使用函数映射来简化URL生成逻辑
-	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, int){
-		"surge_vmess":   genSurgeVmessUrl,
-		"surge_trojan":  genSurgeTrojanUrl,
-		"clash_vmess":   genClashVmessUrl,
-		"clash_trojan":  genClashTrojanUrl,
-		"clash_vless":   genClashVlessUrl,
-		"quanx_vmess":   genQuanXVmessUrl,
-		"quanx_trojan":  genQuanXTrojanUrl,
-		"quanx_vless":   genQuanXVlessUrl,
-		"loon_vmess":    genLoonVmessUrl,
-		"loon_trojan":   genLoonTrojanUrl,
-		"loon_vless":    genLoonVlessUrl,
-		"v2rayn_vmess":  genV2raynVmessUrl,
-		"v2rayn_trojan": genV2raynTrojanUrl,
-		"v2rayn_vless":  genV2raynVlessUrl,
-	}
+	generator := urlGeneratorMap[generatorKey(f)]
 
 	// 按国家分组节点
 	countryNodes := make(map[string][]cache.BestNode)
@@ -461,39 +386,6 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 				continue
 			}
 
-			// 根据格式类型选择URL生成器
-			var generator func(*strings.Builder, config.ProxyInfo, string, string, string, int)
-			switch {
-			case f.Surge && f.Vmess:
-				generator = urlGenerators["surge_vmess"]
-			case f.Surge && f.Trojan:
-				generator = urlGenerators["surge_trojan"]
-			case f.Clash && f.Vmess:
-				generator = urlGenerators["clash_vmess"]
-			case f.Clash && f.Trojan:
-				generator = urlGenerators["clash_trojan"]
-			case f.Clash && f.Vless:
-				generator = urlGenerators["clash_vless"]
-			case f.QuanX && f.Vmess:
-				generator = urlGenerators["quanx_vmess"]
-			case f.QuanX && f.Trojan:
-				generator = urlGenerators["quanx_trojan"]
-			case f.QuanX && f.Vless:
-				generator = urlGenerators["quanx_vless"]
-			case f.Loon && f.Vmess:
-				generator = urlGenerators["loon_vmess"]
-			case f.Loon && f.Trojan:
-				generator = urlGenerators["loon_trojan"]
-			case f.Loon && f.Vless:
-				generator = urlGenerators["loon_vless"]
-			case f.V2rayn && f.Vmess:
-				generator = urlGenerators["v2rayn_vmess"]
-			case f.V2rayn && f.Trojan:
-				generator = urlGenerators["v2rayn_trojan"]
-			case f.V2rayn && f.Vless:
-				generator = urlGenerators["v2rayn_vless"]
-			}
-
 			if generator != nil {
 				if isIPV6 && !IsIPv6(node.Ip) {
 					continue
@@ -510,113 +402,22 @@ func SubNiceProxyIp(format string, distNodeCountry string, proxyCountryIsoCode s
 }
 
 func SubNiceCfProxyIp(format string, distNodeCountry string, isIPV6 bool) (s string, err error) {
-	// 使用defer来记录函数执行时间
-	start := time.Now()
-	defer func() {
-		log.Infoln("SubNiceCfProxyIp completed in %v", time.Since(start))
-	}()
-
-	// 检查格式并获取配置
+	defer trackDuration("SubNiceCfProxyIp")()
 	f, err := checkFormat(format, distNodeCountry)
 	if err != nil {
 		log.Errorln("Format check failed: %v", err)
 		return "", fmt.Errorf("format check error: %w", err)
 	}
-
-	// 获取 cf_best_ip list
 	bestCfNodeList := config.Config().CfBestIp
 	if len(bestCfNodeList) == 0 {
 		log.Errorln("No best cf nodes found")
 		return "", errors.New("not found best cf node list")
 	}
-
-	// 预分配buffer以提高性能
-	buf := strings.Builder{}
-	buf.Grow(len(bestCfNodeList) * 30) // 预估每个节点约30字节
-
-	// 写入头部信息
-	if !f.V2rayn {
-		buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
-		if f.Clash {
-			buf.WriteString("proxies:\n")
-		}
+	proxyInfo, err := loadProxyInfo()
+	if err != nil {
+		return "", err
 	}
-
-	// 复制代理信息以避免并发问题
-	var proxyInfo config.ProxyInfo
-	if err := copier.Copy(&proxyInfo, &config.Config().ProxyInfo); err != nil {
-		log.Errorln("Failed to copy proxy info: %v", err)
-		return "", fmt.Errorf("proxy info copy error: %w", err)
-	}
-
-	// 使用函数映射来简化URL生成逻辑
-	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, int){
-		"surge_vmess":   genSurgeVmessUrl,
-		"surge_trojan":  genSurgeTrojanUrl,
-		"clash_vmess":   genClashVmessUrl,
-		"clash_trojan":  genClashTrojanUrl,
-		"clash_vless":   genClashVlessUrl,
-		"quanx_vmess":   genQuanXVmessUrl,
-		"quanx_trojan":  genQuanXTrojanUrl,
-		"quanx_vless":   genQuanXVlessUrl,
-		"loon_vmess":    genLoonVmessUrl,
-		"loon_trojan":   genLoonTrojanUrl,
-		"loon_vless":    genLoonVlessUrl,
-		"v2rayn_vmess":  genV2raynVmessUrl,
-		"v2rayn_trojan": genV2raynTrojanUrl,
-		"v2rayn_vless":  genV2raynVlessUrl,
-	}
-
-	// 处理每个国家的节点，并应用limit限制
-	for _, node := range bestCfNodeList {
-		// 根据格式类型选择URL生成器
-		var generator func(*strings.Builder, config.ProxyInfo, string, string, string, int)
-		switch {
-		case f.Surge && f.Vmess:
-			generator = urlGenerators["surge_vmess"]
-		case f.Surge && f.Trojan:
-			generator = urlGenerators["surge_trojan"]
-		case f.Clash && f.Vmess:
-			generator = urlGenerators["clash_vmess"]
-		case f.Clash && f.Trojan:
-			generator = urlGenerators["clash_trojan"]
-		case f.Clash && f.Vless:
-			generator = urlGenerators["clash_vless"]
-		case f.QuanX && f.Vmess:
-			generator = urlGenerators["quanx_vmess"]
-		case f.QuanX && f.Trojan:
-			generator = urlGenerators["quanx_trojan"]
-		case f.QuanX && f.Vless:
-			generator = urlGenerators["quanx_vless"]
-		case f.Loon && f.Vmess:
-			generator = urlGenerators["loon_vmess"]
-		case f.Loon && f.Trojan:
-			generator = urlGenerators["loon_trojan"]
-		case f.Loon && f.Vless:
-			generator = urlGenerators["loon_vless"]
-		case f.V2rayn && f.Vmess:
-			generator = urlGenerators["v2rayn_vmess"]
-		case f.V2rayn && f.Trojan:
-			generator = urlGenerators["v2rayn_trojan"]
-		case f.V2rayn && f.Vless:
-			generator = urlGenerators["v2rayn_vless"]
-		}
-
-		country := geoIp.GeoIpDB.FindCountryIsoEmoji(distNodeCountry)
-
-		if generator != nil {
-			if isIPV6 && !IsIPv6(node) {
-				continue
-			}
-			generator(&buf, proxyInfo, distNodeCountry, country, node, 443)
-		}
-	}
-
-	if f.V2rayn {
-		return base64.StdEncoding.EncodeToString([]byte(buf.String())), nil
-	}
-
-	return buf.String(), nil
+	return buildNodeOutput(bestCfNodeList, f, proxyInfo, distNodeCountry, isIPV6, 443), nil
 }
 
 // vps789 openapi
@@ -652,31 +453,12 @@ type CfIpTop20 struct {
 
 // SubNiceCfProxyIpTop20 获取 https://vps789.com/openApi/cfIpTop20
 func SubNiceCfProxyIpTop20(format string, distNodeCountry string, isConvertIp bool, isIPV6 bool) (s string, err error) {
-	// 使用defer来记录函数执行时间
-	start := time.Now()
-	defer func() {
-		log.Infoln("SubNiceCfProxyIp completed in %v", time.Since(start))
-	}()
-
-	// 检查格式并获取配置
+	defer trackDuration("SubNiceCfProxyIpTop20")()
 	f, err := checkFormat(format, distNodeCountry)
 	if err != nil {
 		log.Errorln("Format check failed: %v", err)
 		return "", fmt.Errorf("format check error: %w", err)
 	}
-
-	// 获取 cf_top_ip list
-	// bestCfNodeList := config.Config().CfBestIp
-	// if len(bestCfNodeList) == 0 {
-	// 	log.Errorln("No best cf nodes found")
-	// 	return "", errors.New("not found best cf node list")
-	// }
-
-	// 	log.Errorln("get cfIpTop20 failed: %v", err)
-	// 	return "", fmt.Errorf("get cfIpTop20 failed: %w", err)
-	// }
-	// defer resp.Body.Close()
-	// ... (replaced by helper)
 
 	ips, err := fetchCfIpTop20()
 	if err != nil {
@@ -698,96 +480,29 @@ func SubNiceCfProxyIpTop20(format string, distNodeCountry string, isConvertIp bo
 			bestCfNodeList = append(bestCfNodeList, ip)
 		}
 	}
-
 	bestCfNodeList = Unique(bestCfNodeList)
 
-	// 预分配buffer以提高性能
-	buf := strings.Builder{}
-	buf.Grow(len(bestCfNodeList) * 30) // 预估每个节点约30字节
-
-	// 写入头部信息
-	if !f.V2rayn {
-		buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
-		if f.Clash {
-			buf.WriteString("proxies:\n")
-		}
+	proxyInfo, err := loadProxyInfo()
+	if err != nil {
+		return "", err
 	}
+	return buildNodeOutput(bestCfNodeList, f, proxyInfo, distNodeCountry, isIPV6, 443), nil
+}
 
-	// 复制代理信息以避免并发问题
-	var proxyInfo config.ProxyInfo
-	if err := copier.Copy(&proxyInfo, &config.Config().ProxyInfo); err != nil {
-		log.Errorln("Failed to copy proxy info: %v", err)
-		return "", fmt.Errorf("proxy info copy error: %w", err)
-	}
-
-	// 使用函数映射来简化URL生成逻辑
-	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, int){
-		"surge_vmess":   genSurgeVmessUrl,
-		"surge_trojan":  genSurgeTrojanUrl,
-		"clash_vmess":   genClashVmessUrl,
-		"clash_trojan":  genClashTrojanUrl,
-		"clash_vless":   genClashVlessUrl,
-		"quanx_vmess":   genQuanXVmessUrl,
-		"quanx_trojan":  genQuanXTrojanUrl,
-		"quanx_vless":   genQuanXVlessUrl,
-		"loon_vmess":    genLoonVmessUrl,
-		"loon_trojan":   genLoonTrojanUrl,
-		"loon_vless":    genLoonVlessUrl,
-		"v2rayn_vmess":  genV2raynVmessUrl,
-		"v2rayn_trojan": genV2raynTrojanUrl,
-		"v2rayn_vless":  genV2raynVlessUrl,
-	}
-
-	// 处理每个国家的节点，并应用limit限制
-	for _, node := range bestCfNodeList {
-		// 根据格式类型选择URL生成器
-		var generator func(*strings.Builder, config.ProxyInfo, string, string, string, int)
-		switch {
-		case f.Surge && f.Vmess:
-			generator = urlGenerators["surge_vmess"]
-		case f.Surge && f.Trojan:
-			generator = urlGenerators["surge_trojan"]
-		case f.Clash && f.Vmess:
-			generator = urlGenerators["clash_vmess"]
-		case f.Clash && f.Trojan:
-			generator = urlGenerators["clash_trojan"]
-		case f.Clash && f.Vless:
-			generator = urlGenerators["clash_vless"]
-		case f.QuanX && f.Vmess:
-			generator = urlGenerators["quanx_vmess"]
-		case f.QuanX && f.Trojan:
-			generator = urlGenerators["quanx_trojan"]
-		case f.QuanX && f.Vless:
-			generator = urlGenerators["quanx_vless"]
-		case f.Loon && f.Vmess:
-			generator = urlGenerators["loon_vmess"]
-		case f.Loon && f.Trojan:
-			generator = urlGenerators["loon_trojan"]
-		case f.Loon && f.Vless:
-			generator = urlGenerators["loon_vless"]
-		case f.V2rayn && f.Vmess:
-			generator = urlGenerators["v2rayn_vmess"]
-		case f.V2rayn && f.Trojan:
-			generator = urlGenerators["v2rayn_trojan"]
-		case f.V2rayn && f.Vless:
-			generator = urlGenerators["v2rayn_vless"]
-		}
-
-		country := geoIp.GeoIpDB.FindCountryIsoEmoji(distNodeCountry)
-
-		if generator != nil {
-			if isIPV6 && !IsIPv6(node) {
-				continue
-			}
-			generator(&buf, proxyInfo, distNodeCountry, country, node, 443)
-		}
-	}
-
-	if f.V2rayn {
-		return base64.StdEncoding.EncodeToString([]byte(buf.String())), nil
-	}
-
-	return buf.String(), nil
+type cfIpItem struct {
+	Ip               string  `json:"ip"`
+	YdLatencyAvg     float64 `json:"ydLatencyAvg"`
+	YdPkgLostRateAvg float64 `json:"ydPkgLostRateAvg"`
+	LtLatencyAvg     float64 `json:"ltLatencyAvg"`
+	LtPkgLostRateAvg float64 `json:"ltPkgLostRateAvg"`
+	DxLatencyAvg     float64 `json:"dxLatencyAvg"`
+	DxPkgLostRateAvg float64 `json:"dxPkgLostRateAvg"`
+	DownloadSpeed    int     `json:"downloadSpeed"`
+	CreatedTime      string  `json:"createdTime"`
+	AvgScore         int     `json:"avgScore"`
+	YdScore          int     `json:"ydScore"`
+	DxScore          int     `json:"dxScore"`
+	LtScore          int     `json:"ltScore"`
 }
 
 type CfIpProvider struct {
@@ -795,184 +510,33 @@ type CfIpProvider struct {
 	Message string `json:"message"`
 	Count   int    `json:"count"`
 	Data    struct {
-		CT []struct {
-			Ip               string  `json:"ip"`
-			YdLatencyAvg     float64 `json:"ydLatencyAvg"`
-			YdPkgLostRateAvg float64 `json:"ydPkgLostRateAvg"`
-			LtLatencyAvg     float64 `json:"ltLatencyAvg"`
-			LtPkgLostRateAvg float64 `json:"ltPkgLostRateAvg"`
-			DxLatencyAvg     float64 `json:"dxLatencyAvg"`
-			DxPkgLostRateAvg float64 `json:"dxPkgLostRateAvg"`
-			DownloadSpeed    int     `json:"downloadSpeed"`
-			CreatedTime      string  `json:"createdTime"`
-			AvgScore         int     `json:"avgScore"`
-			YdScore          int     `json:"ydScore"`
-			DxScore          int     `json:"dxScore"`
-			LtScore          int     `json:"ltScore"`
-		} `json:"CT"`
-		CU []struct {
-			Ip               string  `json:"ip"`
-			YdLatencyAvg     float64 `json:"ydLatencyAvg"`
-			YdPkgLostRateAvg float64 `json:"ydPkgLostRateAvg"`
-			LtLatencyAvg     float64 `json:"ltLatencyAvg"`
-			LtPkgLostRateAvg float64 `json:"ltPkgLostRateAvg"`
-			DxLatencyAvg     float64 `json:"dxLatencyAvg"`
-			DxPkgLostRateAvg float64 `json:"dxPkgLostRateAvg"`
-			DownloadSpeed    int     `json:"downloadSpeed"`
-			CreatedTime      string  `json:"createdTime"`
-			AvgScore         int     `json:"avgScore"`
-			YdScore          int     `json:"ydScore"`
-			DxScore          int     `json:"dxScore"`
-			LtScore          int     `json:"ltScore"`
-		} `json:"CU"`
-		CM []struct {
-			Ip               string  `json:"ip"`
-			YdLatencyAvg     float64 `json:"ydLatencyAvg"`
-			YdPkgLostRateAvg float64 `json:"ydPkgLostRateAvg"`
-			LtLatencyAvg     float64 `json:"ltLatencyAvg"`
-			LtPkgLostRateAvg float64 `json:"ltPkgLostRateAvg"`
-			DxLatencyAvg     float64 `json:"dxLatencyAvg"`
-			DxPkgLostRateAvg float64 `json:"dxPkgLostRateAvg"`
-			DownloadSpeed    int     `json:"downloadSpeed"`
-			CreatedTime      string  `json:"createdTime"`
-			AvgScore         int     `json:"avgScore"`
-			YdScore          int     `json:"ydScore"`
-			DxScore          int     `json:"dxScore"`
-			LtScore          int     `json:"ltScore"`
-		} `json:"CM"`
-		AllAvg []struct {
-			Ip               string  `json:"ip"`
-			YdLatencyAvg     float64 `json:"ydLatencyAvg"`
-			YdPkgLostRateAvg float64 `json:"ydPkgLostRateAvg"`
-			LtLatencyAvg     float64 `json:"ltLatencyAvg"`
-			LtPkgLostRateAvg float64 `json:"ltPkgLostRateAvg"`
-			DxLatencyAvg     float64 `json:"dxLatencyAvg"`
-			DxPkgLostRateAvg float64 `json:"dxPkgLostRateAvg"`
-			DownloadSpeed    int     `json:"downloadSpeed"`
-			CreatedTime      string  `json:"createdTime"`
-			AvgScore         int     `json:"avgScore"`
-			YdScore          int     `json:"ydScore"`
-			DxScore          int     `json:"dxScore"`
-			LtScore          int     `json:"ltScore"`
-		} `json:"AllAvg"`
+		CT     []cfIpItem `json:"CT"`
+		CU     []cfIpItem `json:"CU"`
+		CM     []cfIpItem `json:"CM"`
+		AllAvg []cfIpItem `json:"AllAvg"`
 	} `json:"data"`
 }
 
 // SubNiceCfProxyIpProvider 获取 https://vps789.com/openApi/cfIpApi
 func SubNiceCfProxyIpProvider(format string, isp string, distNodeCountry string, isIPV6 bool) (s string, err error) {
-	// 使用defer来记录函数执行时间
-	start := time.Now()
-	defer func() {
-		log.Infoln("SubNiceCfProxyIpProvider completed in %v", time.Since(start))
-	}()
-
-	// 检查格式并获取配置
+	defer trackDuration("SubNiceCfProxyIpProvider")()
 	f, err := checkFormat(format, distNodeCountry)
 	if err != nil {
 		log.Errorln("Format check failed: %v", err)
 		return "", fmt.Errorf("format check error: %w", err)
 	}
 
-	// 获取 cf_top_ip list
-	// bestCfNodeList := config.Config().CfBestIp
-	// if len(bestCfNodeList) == 0 {
-	// 	log.Errorln("No best cf nodes found")
-	// 	return "", errors.New("not found best cf node list")
-	// }
-
-	// Fetch IPs using helper
 	bestCfNodeList, err := fetchCfIpProvider(isp)
 	if err != nil {
 		log.Errorln("fetchCfIpProvider failed: %v", err)
 		return "", err
 	}
 
-	// 预分配buffer以提高性能
-	buf := strings.Builder{}
-	buf.Grow(len(bestCfNodeList) * 30) // 预估每个节点约30字节
-
-	// 写入头部信息
-	if !f.V2rayn {
-		buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
-		if f.Clash {
-			buf.WriteString("proxies:\n")
-		}
+	proxyInfo, err := loadProxyInfo()
+	if err != nil {
+		return "", err
 	}
-
-	// 复制代理信息以避免并发问题
-	var proxyInfo config.ProxyInfo
-	if err := copier.Copy(&proxyInfo, &config.Config().ProxyInfo); err != nil {
-		log.Errorln("Failed to copy proxy info: %v", err)
-		return "", fmt.Errorf("proxy info copy error: %w", err)
-	}
-
-	// 使用函数映射来简化URL生成逻辑
-	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, int){
-		"surge_vmess":   genSurgeVmessUrl,
-		"surge_trojan":  genSurgeTrojanUrl,
-		"clash_vmess":   genClashVmessUrl,
-		"clash_trojan":  genClashTrojanUrl,
-		"clash_vless":   genClashVlessUrl,
-		"quanx_vmess":   genQuanXVmessUrl,
-		"quanx_trojan":  genQuanXTrojanUrl,
-		"quanx_vless":   genQuanXVlessUrl,
-		"loon_vmess":    genLoonVmessUrl,
-		"loon_trojan":   genLoonTrojanUrl,
-		"loon_vless":    genLoonVlessUrl,
-		"v2rayn_vmess":  genV2raynVmessUrl,
-		"v2rayn_trojan": genV2raynTrojanUrl,
-		"v2rayn_vless":  genV2raynVlessUrl,
-	}
-
-	// 处理每个国家的节点，并应用limit限制
-	for _, node := range bestCfNodeList {
-		// 根据格式类型选择URL生成器
-		var generator func(*strings.Builder, config.ProxyInfo, string, string, string, int)
-		switch {
-		case f.Surge && f.Vmess:
-			generator = urlGenerators["surge_vmess"]
-		case f.Surge && f.Trojan:
-			generator = urlGenerators["surge_trojan"]
-		case f.Clash && f.Vmess:
-			generator = urlGenerators["clash_vmess"]
-		case f.Clash && f.Trojan:
-			generator = urlGenerators["clash_trojan"]
-		case f.Clash && f.Vless:
-			generator = urlGenerators["clash_vless"]
-		case f.QuanX && f.Vmess:
-			generator = urlGenerators["quanx_vmess"]
-		case f.QuanX && f.Trojan:
-			generator = urlGenerators["quanx_trojan"]
-		case f.QuanX && f.Vless:
-			generator = urlGenerators["quanx_vless"]
-		case f.Loon && f.Vmess:
-			generator = urlGenerators["loon_vmess"]
-		case f.Loon && f.Trojan:
-			generator = urlGenerators["loon_trojan"]
-		case f.Loon && f.Vless:
-			generator = urlGenerators["loon_vless"]
-		case f.V2rayn && f.Vmess:
-			generator = urlGenerators["v2rayn_vmess"]
-		case f.V2rayn && f.Trojan:
-			generator = urlGenerators["v2rayn_trojan"]
-		case f.V2rayn && f.Vless:
-			generator = urlGenerators["v2rayn_vless"]
-		}
-
-		country := geoIp.GeoIpDB.FindCountryIsoEmoji(distNodeCountry)
-
-		if generator != nil {
-			if isIPV6 && !IsIPv6(node) {
-				continue
-			}
-			generator(&buf, proxyInfo, distNodeCountry, country, node, 443)
-		}
-	}
-
-	if f.V2rayn {
-		return base64.StdEncoding.EncodeToString([]byte(buf.String())), nil
-	}
-	return buf.String(), nil
+	return buildNodeOutput(bestCfNodeList, f, proxyInfo, distNodeCountry, isIPV6, 443), nil
 }
 
 // ---------------- Helper Functions for Fetching Data ----------------
@@ -1018,22 +582,7 @@ func fetchCfIpProvider(isp string) ([]string, error) {
 		return nil, fmt.Errorf("json unmarshal failed: %w", err)
 	}
 
-	var ips []string
-	var targets []struct {
-		Ip               string  `json:"ip"`
-		YdLatencyAvg     float64 `json:"ydLatencyAvg"`
-		YdPkgLostRateAvg float64 `json:"ydPkgLostRateAvg"`
-		LtLatencyAvg     float64 `json:"ltLatencyAvg"`
-		LtPkgLostRateAvg float64 `json:"ltPkgLostRateAvg"`
-		DxLatencyAvg     float64 `json:"dxLatencyAvg"`
-		DxPkgLostRateAvg float64 `json:"dxPkgLostRateAvg"`
-		DownloadSpeed    int     `json:"downloadSpeed"`
-		CreatedTime      string  `json:"createdTime"`
-		AvgScore         int     `json:"avgScore"`
-		YdScore          int     `json:"ydScore"`
-		DxScore          int     `json:"dxScore"`
-		LtScore          int     `json:"ltScore"`
-	}
+	var targets []cfIpItem
 
 	switch isp {
 	case "CT":
@@ -1049,6 +598,7 @@ func fetchCfIpProvider(isp string) ([]string, error) {
 		targets = append(targets, provider.Data.CM...)
 	}
 
+	ips := make([]string, 0, len(targets))
 	for _, item := range targets {
 		ips = append(ips, item.Ip)
 	}
@@ -1063,11 +613,7 @@ type nodeBase struct {
 
 // SubNiceCfProxySub 从 cf sub 订阅连接替换为自己的 IP
 func SubNiceCfProxySub(format string, sub string, distNodeCountry string, isIPV6 bool) (s string, err error) {
-	// 使用defer来记录函数执行时间
-	start := time.Now()
-	defer func() {
-		log.Infoln("SubNiceCfProxySub completed in %v", time.Since(start))
-	}()
+	defer trackDuration("SubNiceCfProxySub")()
 
 	// 检查格式并获取配置
 	f, err := checkFormat(format, distNodeCountry)
@@ -1117,73 +663,17 @@ func SubNiceCfProxySub(format string, sub string, distNodeCountry string, isIPV6
 	buf := strings.Builder{}
 	buf.Grow(len(bestCfNodeList) * 30) // 预估每个节点约30字节
 
-	// 写入头部信息
-	if !f.V2rayn {
-		buf.WriteString("# " + time.Now().Format(time.RFC3339) + "\n")
-		if f.Clash {
-			buf.WriteString("proxies:\n")
-		}
-	}
+	writeOutputHeader(&buf, f, time.Now().Format(time.RFC3339))
 
 	// 复制代理信息以避免并发问题
-	var proxyInfo config.ProxyInfo
-	if err := copier.Copy(&proxyInfo, &config.Config().ProxyInfo); err != nil {
-		log.Errorln("Failed to copy proxy info: %v", err)
-		return "", fmt.Errorf("proxy info copy error: %w", err)
+	proxyInfo, err := loadProxyInfo()
+	if err != nil {
+		return "", err
 	}
-
-	// 使用函数映射来简化URL生成逻辑
-	urlGenerators := map[string]func(*strings.Builder, config.ProxyInfo, string, string, string, string, int){
-		"surge_vmess":   genSurgeVmessUrl2,
-		"surge_trojan":  genSurgeTrojanUrl2,
-		"clash_vmess":   genClashVmessUrl2,
-		"clash_trojan":  genClashTrojanUrl2,
-		"clash_vless":   genClashVlessUrl2,
-		"quanx_vmess":   genQuanXVmessUrl2,
-		"quanx_trojan":  genQuanXTrojanUrl2,
-		"quanx_vless":   genQuanXVlessUrl2,
-		"loon_vmess":    genLoonVmessUrl2,
-		"loon_trojan":   genLoonTrojanUrl2,
-		"loon_vless":    genLoonVlessUrl2,
-		"v2rayn_vmess":  genV2raynVmessUrl2,
-		"v2rayn_trojan": genV2raynTrojanUrl2,
-		"v2rayn_vless":  genV2raynVlessUrl2,
-	}
+	generator := urlGeneratorMap2[generatorKey(f)]
 
 	// 处理每个国家的节点，并应用limit限制
 	for idx, node := range bestCfNodeList {
-		// 根据格式类型选择URL生成器
-		var generator func(*strings.Builder, config.ProxyInfo, string, string, string, string, int)
-		switch {
-		case f.Surge && f.Vmess:
-			generator = urlGenerators["surge_vmess"]
-		case f.Surge && f.Trojan:
-			generator = urlGenerators["surge_trojan"]
-		case f.Clash && f.Vmess:
-			generator = urlGenerators["clash_vmess"]
-		case f.Clash && f.Trojan:
-			generator = urlGenerators["clash_trojan"]
-		case f.Clash && f.Vless:
-			generator = urlGenerators["clash_vless"]
-		case f.QuanX && f.Vmess:
-			generator = urlGenerators["quanx_vmess"]
-		case f.QuanX && f.Trojan:
-			generator = urlGenerators["quanx_trojan"]
-		case f.QuanX && f.Vless:
-			generator = urlGenerators["quanx_vless"]
-		case f.Loon && f.Vmess:
-			generator = urlGenerators["loon_vmess"]
-		case f.Loon && f.Trojan:
-			generator = urlGenerators["loon_trojan"]
-		case f.Loon && f.Vless:
-			generator = urlGenerators["loon_vless"]
-		case f.V2rayn && f.Vmess:
-			generator = urlGenerators["v2rayn_vmess"]
-		case f.V2rayn && f.Trojan:
-			generator = urlGenerators["v2rayn_trojan"]
-		case f.V2rayn && f.Vless:
-			generator = urlGenerators["v2rayn_vless"]
-		}
 
 		country := geoIp.GeoIpDB.FindCountryIsoEmoji(distNodeCountry)
 
@@ -1206,23 +696,7 @@ func SubNiceCfProxySub(format string, sub string, distNodeCountry string, isIPV6
 		}
 	}
 
-	if f.V2rayn {
-		return base64.StdEncoding.EncodeToString([]byte(buf.String())), nil
-	}
-	return buf.String(), nil
-}
-
-func filterIpCountry(filter []string, c string) bool {
-	if len(filter) == 0 || filter[0] == "" {
-		return true
-	}
-	for _, f := range filter {
-		if strings.Contains(c, f) {
-			return true
-		}
-	}
-
-	return false
+	return finishOutput(&buf, f), nil
 }
 
 func checkFormat(format string, distNodeCountry string) (f Format, err error) {
@@ -1272,18 +746,6 @@ func ExtractHostPort(link string) (addr string, err error) {
 	}
 
 	return u.Host, nil
-}
-
-func removeDuplicateElement(languages []string) []string {
-	result := make([]string, 0, len(languages))
-	temp := map[string]struct{}{}
-	for _, item := range languages {
-		if _, ok := temp[item]; !ok {
-			temp[item] = struct{}{}
-			result = append(result, item)
-		}
-	}
-	return result
 }
 
 func ipToUint32(ip string) uint32 {

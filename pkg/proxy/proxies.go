@@ -55,6 +55,23 @@ func (ps ProxyList) TypeLen(t string) int {
 	return l
 }
 
+// TypeCounts 单次遍历统计各类型数量（替代多次 TypeLen 的 O(4n) 扫描）
+func (ps ProxyList) TypeCounts() (ss, ssr, vmess, trojan int) {
+	for _, p := range ps {
+		switch p.TypeName() {
+		case "ss":
+			ss++
+		case "ssr":
+			ssr++
+		case "vmess":
+			vmess++
+		case "trojan":
+			trojan++
+		}
+	}
+	return
+}
+
 var sortType = make(map[string]int)
 
 func init() {

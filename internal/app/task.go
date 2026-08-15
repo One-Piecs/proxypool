@@ -69,13 +69,15 @@ func CrawlGo() {
 	cache.SetProxies("allproxies", proxies)
 	cache.AllProxiesCount = proxies.Len()
 	log.Infoln("AllProxiesCount: %d", cache.AllProxiesCount)
-	cache.SSProxiesCount = proxies.TypeLen("ss")
+	// 单次遍历统计各类型数量
+	ssCount, ssrCount, vmessCount, trojanCount := proxies.TypeCounts()
+	cache.SSProxiesCount = ssCount
 	log.Infoln("SSProxiesCount: %d", cache.SSProxiesCount)
-	cache.SSRProxiesCount = proxies.TypeLen("ssr")
+	cache.SSRProxiesCount = ssrCount
 	log.Infoln("SSRProxiesCount: %d", cache.SSRProxiesCount)
-	cache.VmessProxiesCount = proxies.TypeLen("vmess")
+	cache.VmessProxiesCount = vmessCount
 	log.Infoln("VmessProxiesCount: %d", cache.VmessProxiesCount)
-	cache.TrojanProxiesCount = proxies.TypeLen("trojan")
+	cache.TrojanProxiesCount = trojanCount
 	log.Infoln("TrojanProxiesCount: %d", cache.TrojanProxiesCount)
 	cache.LastCrawlTime = time.Now().In(location).Format("2006-01-02 15:04:05")
 
@@ -158,10 +160,12 @@ func CrawlGo() {
 	// 可用节点存储
 	cache.SetProxies("proxies", proxies)
 	cache.UsefullProxiesCount = proxies.Len()
-	cache.UsefullSSRProxiesCount = proxies.TypeLen("ssr")
-	cache.UsefullSSProxiesCount = proxies.TypeLen("ss")
-	cache.UsefullVmessProxiesCount = proxies.TypeLen("vmess")
-	cache.UsefullTrojanProxiesCount = proxies.TypeLen("trojan")
+	// 单次遍历统计各类型数量（变量已在上面声明）
+	ssCount, ssrCount, vmessCount, trojanCount = proxies.TypeCounts()
+	cache.UsefullSSRProxiesCount = ssrCount
+	cache.UsefullSSProxiesCount = ssCount
+	cache.UsefullVmessProxiesCount = vmessCount
+	cache.UsefullTrojanProxiesCount = trojanCount
 	database.SaveProxyList(proxies)
 	// database.SaveBlockProxyList(healthcheck.ProxyInvalidStats)
 	database.ClearOldItems()
@@ -170,21 +174,7 @@ func CrawlGo() {
 
 	// 测速
 	speedTestNew(proxies)
-	cache.SetString("clashproxies", provider.Clash{
-		Base: provider.Base{
-			Proxies: &proxies,
-		},
-	}.Provide()) // update static string provider
-	cache.SetString("surgeproxies", provider.Surge{
-		Base: provider.Base{
-			Proxies: &proxies,
-		},
-	}.Provide())
-	cache.SetString("loonproxies", provider.Loon{
-		Base: provider.Base{
-			Proxies: &proxies,
-		},
-	}.Provide())
+	RefreshProviderCache(proxies)
 }
 
 // Speed test for new proxies
