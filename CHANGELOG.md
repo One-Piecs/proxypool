@@ -340,6 +340,22 @@
 - 移除已替换依赖在 `go.mod` / `go.sum` 中的条目
 - 变更规模：28 个文件，+701 / -1270 行（净减约 570 行）
 
+## [v1.1.39] - 2026-08-16
+
+### 🐛 按客户端官方格式修正 Loon / QuanX 的 Reality 输出
+
+- **Loon**（`/loon/proxies`）：补全官方格式
+  `name = VLESS, server, port, "uuid", transport=tcp, flow=xtls-rprx-vision,
+  public-key="...", short-id=..., over-tls=true, sni=..., udp=true`
+  （原实现缺 public-key / short-id / flow / sni / udp，且用 tls-name 而非 sni）
+- **QuanX**（`/quanx/proxies`）：补全官方格式
+  `obfs=over-tls, obfs-host=..., reality-base64-pubkey=...,
+  reality-hex-shortid=..., vless-flow=xtls-rprx-vision`
+  （原实现完全没有输出 reality 参数）
+- **Clash / v2rayN(Link)**：v1.1.38 已与官方格式一致，无需改动
+- 新增 `TestVlessRealityOutput`：断言 Loon/QuanX 的 reality 参数齐全，
+  非 reality 节点不输出 reality 参数
+
 ## [v1.1.38] - 2026-08-16
 
 ### 🚀 补全 vless Reality 与 grpc 传输支持

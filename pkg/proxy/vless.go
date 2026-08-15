@@ -75,15 +75,32 @@ func (v Vless) ToQuanX() string {
 		}
 		text += fmt.Sprintf(", obfs=wss, obfs-uri=%s, obfs-host=%s", path, host)
 	case "grpc":
+		text += ", obfs=none"
 		if v.GrpcServiceName != "" {
 			text += ", grpc-service-name=" + v.GrpcServiceName
 		}
 	}
 	if v.TLS {
-		if host == "" {
-			host = v.Server
+		if v.RealityPublicKey != "" {
+			// Reality：over-tls + 公钥 + short-id + flow
+			sni := v.ServerName
+			if sni == "" {
+				sni = v.Server
+			}
+			text += fmt.Sprintf(", obfs=over-tls, obfs-host=%s, reality-base64-pubkey=%s", sni, v.RealityPublicKey)
+			if v.RealityShortID != "" {
+				text += ", reality-hex-shortid=" + v.RealityShortID
+			}
+		} else {
+			// 普通 tls
+			if host == "" {
+				host = v.Server
+			}
+			text += fmt.Sprintf(", obfs=over-tls, obfs-host=%s, tls-verification=%v", host, !v.SkipCertVerify)
 		}
-		text += fmt.Sprintf(", tls-host=%s, tls-verification=%v", host, !v.SkipCertVerify)
+	}
+	if v.Flow != "" {
+		text += ", vless-flow=" + v.Flow
 	}
 	return text
 }
@@ -210,32 +227,49 @@ func (v Vless) ToSurge() string {
 	return text
 }
 
-// ToLoon 输出 loon 配置
+// ToLoon 输出 loon 配置（官方格式：name = VLESS, server, port, "uuid", transport=..., flow=..., public-key=..., over-tls=true, sni=...）
 func (v Vless) ToLoon() string {
 	network := v.Network
 	if network == "" {
 		network = "tcp"
 	}
-	text := fmt.Sprintf(`%s = vless, %s, %d, "%s", transport:%s, over-tls:%v`,
-		v.Name, v.Server, v.Port, v.UUID, network, v.TLS)
+	text := fmt.Sprintf(`%s = VLESS, %s, %d, "%s", transport=%s`,
+		v.Name, v.Server, v.Port, v.UUID, network)
 	if network == "ws" {
 		path := v.WSPath
 		if path == "" {
 			path = "/"
 		}
-		text += fmt.Sprintf(", path:%s", path)
+		text += fmt.Sprintf(", ws-path=%s", path)
+		if v.Host != "" {
+			text += fmt.Sprintf(`, ws-headers="Host:%s"`, v.Host)
+		}
 	}
 	if network == "grpc" && v.GrpcServiceName != "" {
-		text += ", grpc-service-name:" + v.GrpcServiceName
+		text += ", grpc-service-name=" + v.GrpcServiceName
+	}
+	if v.Flow != "" {
+		text += ", flow=" + v.Flow
 	}
 	if v.TLS {
-		if v.ServerName != "" {
-			text += ", tls-name:" + v.ServerName
+		text += ", over-tls=true"
+		sni := v.ServerName
+		if sni == "" {
+			sni = v.Server
 		}
-		text += fmt.Sprintf(", skip-cert-verify:%v", v.SkipCertVerify)
+		text += ", sni=" + sni
+		if v.SkipCertVerify {
+			text += ", skip-cert-verify=true"
+		}
 	}
-	if v.Host != "" {
-		text += ", host:" + v.Host
+	if v.RealityPublicKey != "" {
+		text += fmt.Sprintf(`, public-key="%s"`, v.RealityPublicKey)
+		if v.RealityShortID != "" {
+			text += ", short-id=" + v.RealityShortID
+		}
+	}
+	if v.UDP {
+		text += ", udp=true"
 	}
 	return text
 }

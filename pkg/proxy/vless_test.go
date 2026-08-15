@@ -207,3 +207,52 @@ func TestVlessGrpc(t *testing.T) {
 		t.Errorf("grpc round-trip mismatch: %+v", v2)
 	}
 }
+
+// TestVlessRealityOutput 验证 Loon / QuanX 的 Reality 参数输出格式
+func TestVlessRealityOutput(t *testing.T) {
+	v := &Vless{
+		Base:             Base{Name: "reality-01", Server: "example.com", Port: 443, Type: "vless"},
+		UDP:              true, // Vless.UDP 遮蔽 Base.UDP
+		UUID:             "11111111-1111-1111-1111-111111111111",
+		TLS:              true,
+		Flow:             "xtls-rprx-vision",
+		Network:          "tcp",
+		ServerName:       "www.apple.com",
+		Fingerprint:      "chrome",
+		RealityPublicKey: "LgJ9bNTyUqBLFkDA12-QgEL7c1yQ1ztk-V1Q-3OLXSk",
+		RealityShortID:   "164168844958a16d",
+	}
+
+	// Loon: public-key / short-id / flow / over-tls / sni / udp
+	loon := v.ToLoon()
+	for _, want := range []string{"VLESS", "transport=tcp", "flow=xtls-rprx-vision",
+		`public-key="LgJ9bNTyUqBLFkDA12-QgEL7c1yQ1ztk-V1Q-3OLXSk"`, "short-id=164168844958a16d",
+		"over-tls=true", "sni=www.apple.com", "udp=true"} {
+		if !strings.Contains(loon, want) {
+			t.Errorf("ToLoon missing %q:\n%s", want, loon)
+		}
+	}
+
+	// QuanX: reality-base64-pubkey / reality-hex-shortid / vless-flow
+	quanx := v.ToQuanX()
+	for _, want := range []string{"vless = ", "reality-base64-pubkey=LgJ9bNTyUqBLFkDA12-QgEL7c1yQ1ztk-V1Q-3OLXSk",
+		"reality-hex-shortid=164168844958a16d", "vless-flow=xtls-rprx-vision", "obfs=over-tls"} {
+		if !strings.Contains(quanx, want) {
+			t.Errorf("ToQuanX missing %q:\n%s", want, quanx)
+		}
+	}
+
+	// 普通 tls(无 reality): QuanX 不应输出 reality 参数
+	tlsOnly := &Vless{
+		Base:       Base{Name: "tls-01", Server: "example.com", Port: 443, Type: "vless"},
+		UUID:       "11111111-1111-1111-1111-111111111111",
+		TLS:        true,
+		Network:    "ws",
+		WSPath:     "/v",
+		ServerName: "cdn.example.com",
+	}
+	q2 := tlsOnly.ToQuanX()
+	if strings.Contains(q2, "reality-base64-pubkey") {
+		t.Errorf("non-reality node should not contain reality params: %s", q2)
+	}
+}
