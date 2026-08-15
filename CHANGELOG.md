@@ -5,6 +5,20 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.29] - 2026-08-16
+
+### 🐛 修复测速任务未重读配置（回归）
+
+- v1.1.23 把任务收敛到 `internal/app` 时，`SpeedTestTask` / `ActiveSpeedTestTask`
+  丢失了原先 cron 中的 `config.Parse("")` 调用
+- 后果：动态修改 `config.yaml`（如开启 `speedtest: true`）后，测速定时器触发时
+  读到的仍是启动时的旧配置，开关不生效
+- 修复：两个测速任务每次触发先重读配置（mtime 缓存，未变化零开销）
+
+> 注：定时任务的**间隔**在启动时固化（`cron.Cron()` 读取一次），
+> 修改 `crawl-interval` / `speedtest-interval` 等需重启进程；
+> 开关类配置（如 `speedtest`）随任务触发热加载，或手动 `GET /task/speedtest` 立即生效
+
 ## [v1.1.28] - 2026-08-16
 
 ### 🐛 修复 /proxies 接口节点名缺失

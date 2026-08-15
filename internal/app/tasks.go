@@ -47,6 +47,11 @@ func CrawlTask() {
 // SpeedTestTask 全量测速任务
 func SpeedTestTask() {
 	RunExclusive("speedtest", func() {
+		// 每次触发都重读配置（带 mtime 缓存，未变化零开销）：
+		// 保证动态修改 config.yaml（如开启 speedtest）后能生效
+		if err := config.Parse(""); err != nil {
+			log.Errorln("[task] config parse error: %s", err)
+		}
 		pl := cache.GetProxies("proxies")
 		SpeedTest(pl)
 		RefreshProviderCache(pl)
@@ -56,6 +61,9 @@ func SpeedTestTask() {
 // ActiveSpeedTestTask 活跃节点高频测速任务
 func ActiveSpeedTestTask() {
 	RunExclusive("active-speedtest", func() {
+		if err := config.Parse(""); err != nil {
+			log.Errorln("[task] config parse error: %s", err)
+		}
 		plAll := cache.GetProxies("proxies")
 		pl := healthcheck.ProxyStats.ReqCountThan(config.Config().ActiveFrequency, plAll, true)
 		if len(pl) > int(config.Config().ActiveMaxNumber) {
