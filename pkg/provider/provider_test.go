@@ -6,8 +6,9 @@ import (
 	"github.com/One-Piecs/proxypool/pkg/proxy"
 )
 
-// TestVlessSupport 验证所有客户端的支持校验都放行 vless，
-// 防止 /loon|/surge|/clash|/quanx/proxies?type=vless 输出为空。
+// TestVlessSupport 验证各客户端的支持校验对 vless 的放行/拒绝符合预期：
+// clash/loon/quanx 支持 vless；surge 客户端不支持 vless 协议（官方仅 ss/ssr/vmess/trojan 等），
+// 其输出不应包含 vless 节点。
 func TestVlessSupport(t *testing.T) {
 	v := &proxy.Vless{
 		Base: proxy.Base{Name: "v1", Server: "example.com", Port: 443, Type: "vless"},
@@ -16,8 +17,8 @@ func TestVlessSupport(t *testing.T) {
 	if !checkLoonSupport(v) {
 		t.Error("checkLoonSupport should support vless")
 	}
-	if !checkSurgeSupport(v) {
-		t.Error("checkSurgeSupport should support vless")
+	if checkSurgeSupport(v) {
+		t.Error("checkSurgeSupport should NOT support vless (Surge 客户端不支持 vless 协议)")
 	}
 	if !checkClashSupport(v) {
 		t.Error("checkClashSupport should support vless")

@@ -340,6 +340,17 @@
 - 移除已替换依赖在 `go.mod` / `go.sum` 中的条目
 - 变更规模：28 个文件，+701 / -1270 行（净减约 570 行）
 
+## [v1.1.37] - 2026-08-16
+
+### 🐛 Surge 不支持 vless，撤销 surge 输出
+
+- Surge 客户端官方仅支持 ss/ssr/vmess/trojan/http/socks5 等，**不支持 vless 协议**；
+  v1.1.35 误在 `checkSurgeSupport` 放行 vless，导致 `/surge/proxies` 输出 Surge
+  无法使用的 vless 节点
+- 修复：移除 `checkSurgeSupport` 的 vless 分支（恢复为不支持），
+  `/surge/proxies?type=vless` 返回空为**正确行为**
+- 更新回归测试：surge 断言为拒绝 vless，clash/loon/quanx 仍放行
+
 ## [v1.1.36] - 2026-08-16
 
 ### 🐛 紧急修复：v1.1.33 破坏全部 HTML 页面

@@ -131,13 +131,21 @@ func TestToQuanX(t *testing.T) {
 		}
 		switch p.TypeName() {
 		case "ss":
-			if !strings.HasPrefix(out, "ss = ") { t.Errorf("ss prefix: %s", out) }
+			if !strings.HasPrefix(out, "ss = ") {
+				t.Errorf("ss prefix: %s", out)
+			}
 		case "vmess":
-			if !strings.HasPrefix(out, "vmess = ") { t.Errorf("vmess prefix: %s", out) }
+			if !strings.HasPrefix(out, "vmess = ") {
+				t.Errorf("vmess prefix: %s", out)
+			}
 		case "trojan":
-			if !strings.HasPrefix(out, "trojan = ") { t.Errorf("trojan prefix: %s", out) }
+			if !strings.HasPrefix(out, "trojan = ") {
+				t.Errorf("trojan prefix: %s", out)
+			}
 		case "vless":
-			if !strings.HasPrefix(out, "vless = ") { t.Errorf("vless prefix: %s", out) }
+			if !strings.HasPrefix(out, "vless = ") {
+				t.Errorf("vless prefix: %s", out)
+			}
 		}
 	}
 }
