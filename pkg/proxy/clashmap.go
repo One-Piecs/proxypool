@@ -80,6 +80,47 @@ func ToClashMap(p Proxy) map[string]interface{} {
 			m["skip-cert-verify"] = pp.SkipCertVerify
 		}
 		return m
+	case *Vless:
+		m := clashBaseMap(pp.Base)
+		m["uuid"] = pp.UUID
+		if pp.UDP {
+			m["udp"] = pp.UDP
+		}
+		network := pp.Network
+		if network == "" {
+			network = "tcp"
+		}
+		m["network"] = network
+		if pp.TLS {
+			m["tls"] = pp.TLS
+		}
+		if pp.ServerName != "" {
+			m["servername"] = pp.ServerName
+		}
+		if pp.Fingerprint != "" {
+			m["client-fingerprint"] = pp.Fingerprint
+		}
+		if pp.Flow != "" {
+			m["flow"] = pp.Flow
+		}
+		if pp.SkipCertVerify {
+			m["skip-cert-verify"] = pp.SkipCertVerify
+		}
+		if network == "ws" {
+			wsOpts := map[string]interface{}{"path": "/"}
+			if pp.WSPath != "" {
+				wsOpts["path"] = pp.WSPath
+			}
+			host := pp.Host
+			if host == "" {
+				host = pp.ServerName
+			}
+			if host != "" {
+				wsOpts["headers"] = map[string]string{"Host": host}
+			}
+			m["ws-opts"] = wsOpts
+		}
+		return m
 	}
 	return nil
 }

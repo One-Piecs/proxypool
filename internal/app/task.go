@@ -70,7 +70,7 @@ func CrawlGo() {
 	cache.AllProxiesCount = proxies.Len()
 	log.Infoln("AllProxiesCount: %d", cache.AllProxiesCount)
 	// 单次遍历统计各类型数量
-	ssCount, ssrCount, vmessCount, trojanCount := proxies.TypeCounts()
+	ssCount, ssrCount, vmessCount, trojanCount, vlessCount := proxies.TypeCounts()
 	cache.SSProxiesCount = ssCount
 	log.Infoln("SSProxiesCount: %d", cache.SSProxiesCount)
 	cache.SSRProxiesCount = ssrCount
@@ -79,6 +79,8 @@ func CrawlGo() {
 	log.Infoln("VmessProxiesCount: %d", cache.VmessProxiesCount)
 	cache.TrojanProxiesCount = trojanCount
 	log.Infoln("TrojanProxiesCount: %d", cache.TrojanProxiesCount)
+	cache.VlessProxiesCount = vlessCount
+	log.Infoln("VlessProxiesCount: %d", cache.VlessProxiesCount)
 	cache.LastCrawlTime = time.Now().In(location).Format("2006-01-02 15:04:05")
 
 	// 节点可用性检测，使用batchsize不能降低内存占用，只是为了看性能
@@ -161,11 +163,12 @@ func CrawlGo() {
 	cache.SetProxies("proxies", proxies)
 	cache.UsefullProxiesCount = proxies.Len()
 	// 单次遍历统计各类型数量（变量已在上面声明）
-	ssCount, ssrCount, vmessCount, trojanCount = proxies.TypeCounts()
+	ssCount, ssrCount, vmessCount, trojanCount, vlessCount = proxies.TypeCounts()
 	cache.UsefullSSRProxiesCount = ssrCount
 	cache.UsefullSSProxiesCount = ssCount
 	cache.UsefullVmessProxiesCount = vmessCount
 	cache.UsefullTrojanProxiesCount = trojanCount
+	cache.UsefullVlessProxiesCount = vlessCount
 	database.SaveProxyList(proxies)
 	// database.SaveBlockProxyList(healthcheck.ProxyInvalidStats)
 	database.ClearOldItems()

@@ -92,6 +92,8 @@ func ParseProxyFromLink(link string) (p Proxy, err error) {
 		p, err = ParseSSLink(link)
 	} else if strings.HasPrefix(link, "trojan://") {
 		p, err = ParseTrojanLink(link)
+	} else if strings.HasPrefix(link, "vless://") {
+		p, err = ParseVlessLink(link)
 	}
 	if err != nil || p == nil {
 		return nil, errors.New("link parse failed")
@@ -135,6 +137,13 @@ func ParseProxyFromClashProxy(p map[string]interface{}) (proxy Proxy, err error)
 		return &proxy, nil
 	case "trojan":
 		var proxy Trojan
+		err := json.Unmarshal(pjson, &proxy)
+		if err != nil {
+			return nil, err
+		}
+		return &proxy, nil
+	case "vless":
+		var proxy Vless
 		err := json.Unmarshal(pjson, &proxy)
 		if err != nil {
 			return nil, err

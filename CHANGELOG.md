@@ -5,6 +5,22 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.31] - 2026-08-16
+
+### 🚀 新增 vless 协议支持
+
+- **新增 `pkg/proxy/vless.go`**：Vless 类型 + 链接解析/生成
+  （`vless://uuid@host:port?...`）、三端输出（Clash/Surge/Loon）、去重标识
+- **解析入口接入**：`ParseProxyFromLink` / `ParseProxyFromClashProxy`
+  （含 clash 配置 `ws-opts` 嵌套结构兼容）
+- **抓取接入**：`GrepLinksFromString` 支持 vless 链接（正则要求 `uuid@host:port` 结构，
+  避免把普通文本误抓为链接）
+- **健康检查/测速接入**：`ToClashMap` 输出 mihomo 所需键名（`ws-opts`/`servername`/
+  `client-fingerprint`/`flow` 等），已验证 mihomo 可解析 ws+tls / tcp / reality+flow 三种变体
+- **Clash 支持校验**：`checkClashSupport` 放行 vless（mihomo 原生支持，无加密白名单限制）
+- **统计与首页**：`TypeCounts`/缓存变量/首页模板增加 vless 计数与订阅入口
+- 新增 5 个单元测试（往返解析、ws 参数、三端输出、链接抓取、clash 配置兼容、mihomo 解析）
+
 ## [v1.1.30] - 2026-08-16
 
 ### 🐛 修复健康检查 done 通道二次关闭 panic
