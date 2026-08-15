@@ -5,7 +5,24 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [v1.1.18] - 2026-08-16
+
+### 🔒 安全修复
+
+修复 Dependabot 报告的影响本分支（`ai`）的 3 个依赖漏洞：
+
+| 依赖 | 变更 | 漏洞 |
+| --- | --- | --- |
+| golang.org/x/crypto | v0.50.0 → v0.55.0 | 13 个 CVE（7 critical / 2 high / 4 medium），含 CVE-2026-39830/39831/39832/39833/39834/42508/46595 等 |
+| golang.org/x/net | v0.53.0 → v0.58.0 | CVE-2026-25680 |
+| github.com/antchfx/xpath | v1.3.5 → v1.3.8 | CVE-2026-32287（high） |
+
+说明：
+- Dependabot 告警按默认分支（`master`）评估，其中 pgx/v5、go-retryablehttp 相关告警
+  仅存在于 `master` 的依赖图，本分支不受影响
+- 升级为间接依赖，与 mihomo 等上游要求（x/crypto ≥ v0.33、x/net ≥ v0.35）兼容
+
+## [v1.1.17] - 2026-08-16
 
 ### 🚀 新增
 
