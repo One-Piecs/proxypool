@@ -5,6 +5,79 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.40] - 2026-08-16
+
+### 🐛 按官方示例最终校准 Loon / QuanX 的 vless 格式
+
+- **Loon**（官方 example.conf）：`tls-name=` 替代 `sni=`（官方 vless 示例用 tls-name），
+  其余已匹配（VLESS 大写 / transport= / over-tls= / skip-cert-verify）
+- **QuanX**（官方示例 quanx.txt）：
+  - `vless=host:port` 去除多余空格（官方无空格）
+  - 修复 ws+tls 节点 `obfs` 重复（官方：ws→obfs=wss、tcp+tls→obfs=over-tls，仅设一次）
+  - reality 参数独立于传输输出（官方 ws 示例也带 reality-base64-pubkey）
+  - 普通 tls 默认 tls-verification，skip-cert-verify 时输出 tls-verification=false
+- 测试断言同步更新；修正测试缓存导致的误判（-count=1 强制重跑）
+
+
+## [v1.1.39] - 2026-08-16
+
+### 🐛 按客户端官方格式修正 Loon / QuanX 的 Reality 输出
+
+- **Loon**（`/loon/proxies`）：补全官方格式
+  `name = VLESS, server, port, "uuid", transport=tcp, flow=xtls-rprx-vision,
+  public-key="...", short-id=..., over-tls=true, sni=..., udp=true`
+  （原实现缺 public-key / short-id / flow / sni / udp，且用 tls-name 而非 sni）
+- **QuanX**（`/quanx/proxies`）：补全官方格式
+  `obfs=over-tls, obfs-host=..., reality-base64-pubkey=...,
+  reality-hex-shortid=..., vless-flow=xtls-rprx-vision`
+  （原实现完全没有输出 reality 参数）
+- **Clash / v2rayN(Link)**：v1.1.38 已与官方格式一致，无需改动
+- 新增 `TestVlessRealityOutput`：断言 Loon/QuanX 的 reality 参数齐全，
+  非 reality 节点不输出 reality 参数
+
+
+## [v1.1.38] - 2026-08-16
+
+### 🚀 补全 vless Reality 与 grpc 传输支持
+
+- **Reality**：解析 `security=reality` 的 `pbk`(public-key) / `sid`(short-id) /
+  `spiderX` 参数；`Link()` 生成时 security 标记为 reality 并带回参数；
+  Clash 输出 / mihomo 映射输出 `reality-opts:{public-key, short-id}`
+- **grpc 传输**：解析 `type=grpc` 的 `serviceName`(兼容 `service_name`)；
+  Clash 输出 / mihomo 映射输出 `grpc-opts:{grpc-service-name}`；
+  Loon / QuanX 输出 grpc-service-name
+- 新增测试：reality 解析/生成往返、grpc 解析/生成往返、
+  mihomo 解析 4 种变体（ws+tls / tcp / reality+flow / grpc+tls，reality 公钥运行时生成保证合法）
+
+
+## [v1.1.37] - 2026-08-16
+
+### 🐛 Surge 不支持 vless，撤销 surge 输出
+
+- Surge 客户端官方仅支持 ss/ssr/vmess/trojan/http/socks5 等，**不支持 vless 协议**；
+  v1.1.35 误在 `checkSurgeSupport` 放行 vless，导致 `/surge/proxies` 输出 Surge
+  无法使用的 vless 节点
+- 修复：移除 `checkSurgeSupport` 的 vless 分支（恢复为不支持），
+  `/surge/proxies?type=vless` 返回空为**正确行为**
+- 更新回归测试：surge 断言为拒绝 vless，clash/loon/quanx 仍放行
+
+
+## [v1.1.36] - 2026-08-16
+
+### 🐛 紧急修复：v1.1.33 破坏全部 HTML 页面
+
+- v1.1.33 用正则脚本批量改导航栏时，`src = group(1) + nav_new + group(3)`
+  先把文件覆盖成导航栏碎片，又执行了一次正则替换，导致 **6 个页面全部被压成
+  9 行坏文件**（index/clash/surge/shadowrocket 在 v1.1.33 被提交为坏版本；
+  loon/quanx 因 .gitignore 的 `config/*` 规则从未入库）
+- 修复：从 v1.1.32 恢复 4 个页面（保留 vless 相关修改），用**精确字符串替换**
+  重新加入 Loon/QuanX 导航，重新生成 loon.html / quanx.html
+- 修复 .gitignore：`config/*` 宽泛规则改为明确忽略 yaml/crt/key/ini，
+  放行 `config/assets/html/*.html` 与 `static/index.js`（页面模板必须入库），
+  补回 `proxypool*`、`data`、mmdb 忽略
+- 验证：6 个页面全部 200 渲染、结构完整（doctype/html/nav/footer 齐全）、
+  导航含 Loon/QuanX
+
 ## [v1.1.35] - 2026-08-16
 
 ### 🐛 修复 /loon|/surge/proxies 的 vless 输出为空
@@ -15,6 +88,7 @@
 - 修复：两个校验函数补充 `case *proxy.Vless: return true`
   （vless 类型自身已有 ToLoon / ToSurge 实现）
 - 新增回归测试：`TestVlessSupport` 覆盖 clash/loon/surge/quanx 四个校验函数
+
 
 ## [v1.1.34] - 2026-08-16
 
@@ -29,6 +103,7 @@
   但大量节点检测时噪音可观，隔离后日志干净
 - 新增回归测试：默认 logger 输出已丢弃、应用日志正常
 
+
 ## [v1.1.33] - 2026-08-16
 
 ### 🚀 新增 /loon /quanx 页面与 QuanX 输出
@@ -40,6 +115,7 @@
 - 所有页面导航栏增加 Loon / QuanX 入口（6 个页面同步）
 - 新增 ToQuanX 输出单元测试
 
+
 ## [v1.1.32] - 2026-08-16
 
 ### 🎨 页面与文档同步 vless
@@ -50,6 +126,7 @@
 - README 协议描述增加 vless
 - **新增 `/vless/sub` 订阅接口**：`VlessSub` provider，base64 编码的 vless:// 链接列表
   （与 vmess/sub 同模式）
+
 
 ## [v1.1.31] - 2026-08-16
 
@@ -67,6 +144,7 @@
 - **统计与首页**：`TypeCounts`/缓存变量/首页模板增加 vless 计数与订阅入口
 - 新增 5 个单元测试（往返解析、ws 参数、三端输出、链接抓取、clash 配置兼容、mihomo 解析）
 
+
 ## [v1.1.30] - 2026-08-16
 
 ### 🐛 修复健康检查 done 通道二次关闭 panic
@@ -79,6 +157,7 @@
 - 修复：移除 `defer close(done)`，done 仅由 goroutine 单一关闭
 - 新增空列表回归测试：空列表不提交任务，StopWait 立即返回并 close(done)，
   旧实现必然二次关闭 panic（无需网络即可复现）
+
 
 ## [v1.1.29] - 2026-08-16
 
@@ -94,6 +173,7 @@
 > 修改 `crawl-interval` / `speedtest-interval` 等需重启进程；
 > 开关类配置（如 `speedtest`）随任务触发热加载，或手动 `GET /task/speedtest` 立即生效
 
+
 ## [v1.1.28] - 2026-08-16
 
 ### 🐛 修复 /proxies 接口节点名缺失
@@ -106,6 +186,7 @@
   现 GeoIP 仅用于补充国家信息（失败用 `🏁 ZZ` 默认值），不再否决节点
 - 新增数据库回归测试：验证加载时恢复 name/country、解析字段正确
 
+
 ## [v1.1.27] - 2026-08-16
 
 ### ⚡ 站点缓存优化
@@ -115,6 +196,7 @@
 - **缓存 key 改用 `URL.RequestURI()` 重建**（含 query）：不依赖服务端填充的
   `RequestURI` 字段，httptest 等场景也能正确区分不同请求，避免 key 塌缩
 - 测试补充：random=true 绕过缓存、无 random 参数仍被缓存、不同路径 key 独立
+
 
 ## [v1.1.26] - 2026-08-16
 
@@ -129,6 +211,7 @@
   保证返回非 nil），worker 发送其返回值
 - 新增回归测试 `TestFindOrCreateDelayStat`：验证首次创建/二次命中更新均返回非 nil
 
+
 ## [v1.1.25] - 2026-08-16
 
 ### 🐛 修复订阅源抓取超时
@@ -137,6 +220,7 @@
   设置 30s 超时（原实现无超时会无限挂起），但部分海外订阅源响应较慢，
   30s 偏紧导致 `context deadline exceeded`；60s 在防挂死与容错间取得平衡
 - 重试退避 1s/2s → **2s/4s**：超时后给慢源更多恢复时间，避免立即重试再次超时
+
 
 ## [v1.1.24] - 2026-08-16
 
@@ -156,6 +240,7 @@
 - **`CrawlGo` 末尾复用 `RefreshProviderCache`**，删除内联的三份 provider 刷新
 - 删除死代码 `removeDuplicateElement`、`filterIpCountry`
 - `internal/app` 净减约 620 行（1696 → 1159 行的核心文件）
+
 
 ## [v1.1.23] - 2026-08-16
 
@@ -180,6 +265,7 @@
 - `/task/*` handler 不再各自重复 `runtime.GC()`（收敛到 RunExclusive）
 - 新增单元测试：`config.Parse` 缓存命中/失效、站点缓存命中/排除
 
+
 ## [v1.1.22] - 2026-08-16
 
 ### 🔧 CI/CD
@@ -200,6 +286,7 @@
 - **合并重复测速函数**：`SpeedTestAllWithWorkpool` 与 `SpeedTestNewWithWorkpool`
   收敛为单一实现（newOnly 参数区分）
 
+
 ## [v1.1.21] - 2026-08-16
 
 ### ⚡ GeoIP 数据库处理优化
@@ -219,6 +306,7 @@
 - `IsCDN` 关键词表大写预编译；删除死代码 `ReInitGeoIpDB`/`GeoIpBinary`/`GeoIpVersion`
 - 新增 5 个单元测试（emoji 映射 / 原子写文件 / 无库容错 / 非法输入 / 关键词覆盖）
 
+
 ## [v1.1.20] - 2026-08-16
 
 ### 🔒 安全修复
@@ -226,6 +314,7 @@
 - 升级 `github.com/quic-go/quic-go` v0.59.0 → v0.61.0，修复 CVE-2026-40898（medium）
 - 该库由 gin v1.12 的 HTTP/3 支持引入（`quic-go/quic-go/http3`），
   至此 Dependabot 报告的 25 个漏洞全部清除
+
 
 ## [v1.1.19] - 2026-08-16
 
@@ -247,6 +336,7 @@
 - 修复 `pkg/geoIp` 测试在 CI 上 panic 的问题：GeoIP 数据库缺失且联网下载失败时
   优雅 `t.Skip` 跳过，而非 panic 导致整个测试失败
 
+
 ## [v1.1.18] - 2026-08-16
 
 ### 🔒 安全修复
@@ -263,6 +353,7 @@
 - Dependabot 告警按默认分支（`master`）评估，其中 pgx/v5、go-retryablehttp 相关告警
   仅存在于 `master` 的依赖图，本分支不受影响
 - 升级为间接依赖，与 mihomo 等上游要求（x/crypto ≥ v0.33、x/net ≥ v0.35）兼容
+
 
 ## [v1.1.17] - 2026-08-16
 
@@ -340,71 +431,3 @@
 - 移除已替换依赖在 `go.mod` / `go.sum` 中的条目
 - 变更规模：28 个文件，+701 / -1270 行（净减约 570 行）
 
-## [v1.1.40] - 2026-08-16
-
-### 🐛 按官方示例最终校准 Loon / QuanX 的 vless 格式
-
-- **Loon**（官方 example.conf）：`tls-name=` 替代 `sni=`（官方 vless 示例用 tls-name），
-  其余已匹配（VLESS 大写 / transport= / over-tls= / skip-cert-verify）
-- **QuanX**（官方示例 quanx.txt）：
-  - `vless=host:port` 去除多余空格（官方无空格）
-  - 修复 ws+tls 节点 `obfs` 重复（官方：ws→obfs=wss、tcp+tls→obfs=over-tls，仅设一次）
-  - reality 参数独立于传输输出（官方 ws 示例也带 reality-base64-pubkey）
-  - 普通 tls 默认 tls-verification，skip-cert-verify 时输出 tls-verification=false
-- 测试断言同步更新；修正测试缓存导致的误判（-count=1 强制重跑）
-
-## [v1.1.39] - 2026-08-16
-
-### 🐛 按客户端官方格式修正 Loon / QuanX 的 Reality 输出
-
-- **Loon**（`/loon/proxies`）：补全官方格式
-  `name = VLESS, server, port, "uuid", transport=tcp, flow=xtls-rprx-vision,
-  public-key="...", short-id=..., over-tls=true, sni=..., udp=true`
-  （原实现缺 public-key / short-id / flow / sni / udp，且用 tls-name 而非 sni）
-- **QuanX**（`/quanx/proxies`）：补全官方格式
-  `obfs=over-tls, obfs-host=..., reality-base64-pubkey=...,
-  reality-hex-shortid=..., vless-flow=xtls-rprx-vision`
-  （原实现完全没有输出 reality 参数）
-- **Clash / v2rayN(Link)**：v1.1.38 已与官方格式一致，无需改动
-- 新增 `TestVlessRealityOutput`：断言 Loon/QuanX 的 reality 参数齐全，
-  非 reality 节点不输出 reality 参数
-
-## [v1.1.38] - 2026-08-16
-
-### 🚀 补全 vless Reality 与 grpc 传输支持
-
-- **Reality**：解析 `security=reality` 的 `pbk`(public-key) / `sid`(short-id) /
-  `spiderX` 参数；`Link()` 生成时 security 标记为 reality 并带回参数；
-  Clash 输出 / mihomo 映射输出 `reality-opts:{public-key, short-id}`
-- **grpc 传输**：解析 `type=grpc` 的 `serviceName`(兼容 `service_name`)；
-  Clash 输出 / mihomo 映射输出 `grpc-opts:{grpc-service-name}`；
-  Loon / QuanX 输出 grpc-service-name
-- 新增测试：reality 解析/生成往返、grpc 解析/生成往返、
-  mihomo 解析 4 种变体（ws+tls / tcp / reality+flow / grpc+tls，reality 公钥运行时生成保证合法）
-
-## [v1.1.37] - 2026-08-16
-
-### 🐛 Surge 不支持 vless，撤销 surge 输出
-
-- Surge 客户端官方仅支持 ss/ssr/vmess/trojan/http/socks5 等，**不支持 vless 协议**；
-  v1.1.35 误在 `checkSurgeSupport` 放行 vless，导致 `/surge/proxies` 输出 Surge
-  无法使用的 vless 节点
-- 修复：移除 `checkSurgeSupport` 的 vless 分支（恢复为不支持），
-  `/surge/proxies?type=vless` 返回空为**正确行为**
-- 更新回归测试：surge 断言为拒绝 vless，clash/loon/quanx 仍放行
-
-## [v1.1.36] - 2026-08-16
-
-### 🐛 紧急修复：v1.1.33 破坏全部 HTML 页面
-
-- v1.1.33 用正则脚本批量改导航栏时，`src = group(1) + nav_new + group(3)`
-  先把文件覆盖成导航栏碎片，又执行了一次正则替换，导致 **6 个页面全部被压成
-  9 行坏文件**（index/clash/surge/shadowrocket 在 v1.1.33 被提交为坏版本；
-  loon/quanx 因 .gitignore 的 `config/*` 规则从未入库）
-- 修复：从 v1.1.32 恢复 4 个页面（保留 vless 相关修改），用**精确字符串替换**
-  重新加入 Loon/QuanX 导航，重新生成 loon.html / quanx.html
-- 修复 .gitignore：`config/*` 宽泛规则改为明确忽略 yaml/crt/key/ini，
-  放行 `config/assets/html/*.html` 与 `static/index.js`（页面模板必须入库），
-  补回 `proxypool*`、`data`、mmdb 忽略
-- 验证：6 个页面全部 200 渲染、结构完整（doctype/html/nav/footer 齐全）、
-  导航含 Loon/QuanX
