@@ -77,6 +77,13 @@ func (w *cacheWriter) WriteString(s string) (int, error) {
 // 触发类/动态接口（/task/、/health、/link/、/debug/*）通过 skipPrefixes 跳过缓存。
 func siteCache(store persistence.CacheStore, expire time.Duration, skipPrefixes ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 带 random=true 的请求（/bestProxyIp 随机打乱节点顺序）不缓存，
+		// 保证每次调用都重新随机，否则 1 分钟内会返回相同的排列
+		if r := c.Query("random"); r == "true" || r == "1" {
+			c.Next()
+			return
+		}
+
 		path := c.Request.URL.Path
 		for _, p := range skipPrefixes {
 			if strings.HasPrefix(path, p) {
@@ -85,7 +92,9 @@ func siteCache(store persistence.CacheStore, expire time.Duration, skipPrefixes 
 			}
 		}
 
-		key := cache.CreateKey(c.Request.RequestURI)
+		// 用 URL.RequestURI() 重建请求 URI（含 query）作为缓存 key：
+		// 不依赖服务端填充的 RequestURI 字段，httptest 等场景也正确区分
+		key := cache.CreateKey(c.Request.URL.RequestURI())
 		var resp cachedResponse
 		if err := store.Get(key, &resp); err == nil {
 			// 命中缓存：回放状态码、响应头与响应体

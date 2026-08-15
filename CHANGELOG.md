@@ -5,6 +5,16 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.27] - 2026-08-16
+
+### ⚡ 站点缓存优化
+
+- **带 `random=true` 的请求（`/bestProxyIp`、`/bestIpKr` 随机打乱节点）跳过缓存**：
+  否则 1 分钟内多次调用会返回完全相同的随机排列，失去随机语义
+- **缓存 key 改用 `URL.RequestURI()` 重建**（含 query）：不依赖服务端填充的
+  `RequestURI` 字段，httptest 等场景也能正确区分不同请求，避免 key 塌缩
+- 测试补充：random=true 绕过缓存、无 random 参数仍被缓存、不同路径 key 独立
+
 ## [v1.1.26] - 2026-08-16
 
 ### 🐛 修复健康检查 nil 指针 panic
