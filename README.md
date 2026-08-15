@@ -2,7 +2,7 @@
   <br>proxypool<br>
 </h1>
 
-<h5 align="center">自动抓取tg频道、订阅地址、公开互联网上的ss、ssr、vmess、trojan节点信息，聚合去重测试可用性后提供节点列表</h5>
+<h5 align="center">自动抓取tg频道、订阅地址、公开互联网上的ss、ssr、vmess、trojan、vless节点信息，聚合去重测试可用性后提供节点列表</h5>
 
 <p align="center">
   <a href="https://github.com/Sansui233/proxypool/actions">
@@ -18,7 +18,7 @@
 
 ## 支持
 
-- 支持ss、ssr、vmess、trojan多种类型
+- 支持ss、ssr、vmess、trojan、vless多种类型
 - Telegram频道抓取
 - 订阅地址抓取解析
 - 公开互联网页面模糊抓取

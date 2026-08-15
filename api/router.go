@@ -342,6 +342,7 @@ func setupRouter() {
 	router.GET("/vmess/sub", subHandler("vmess", func(b provider.Base) string { return provider.VmessSub{Base: b}.Provide() }))
 	router.GET("/sip002/sub", subHandler("ss", func(b provider.Base) string { return provider.SIP002Sub{Base: b}.Provide() }))
 	router.GET("/trojan/sub", subHandler("trojan", func(b provider.Base) string { return provider.TrojanSub{Base: b}.Provide() }))
+	router.GET("/vless/sub", subHandler("vless", func(b provider.Base) string { return provider.VlessSub{Base: b}.Provide() }))
 
 	router.GET("/link/:id", func(c *gin.Context) {
 		proxies := appcache.GetProxies("allproxies")

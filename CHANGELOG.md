@@ -5,6 +5,17 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.32] - 2026-08-16
+
+### 🎨 页面与文档同步 vless
+
+- `/clash` 页面：meta 描述、type 筛选值表格增加 vless
+- `/surge`、`/shadowrocket` 页面：meta 描述增加 vless
+- `index.html`：订阅表格改用专用 `/vless/sub` 入口（原 clash 筛选链接）
+- README 协议描述增加 vless
+- **新增 `/vless/sub` 订阅接口**：`VlessSub` provider，base64 编码的 vless:// 链接列表
+  （与 vmess/sub 同模式）
+
 ## [v1.1.31] - 2026-08-16
 
 ### 🚀 新增 vless 协议支持
