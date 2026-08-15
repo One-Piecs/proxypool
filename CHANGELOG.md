@@ -5,6 +5,19 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.34] - 2026-08-16
+
+### 🐛 静默 mihomo 内部日志噪音
+
+- 健康检查/测速时 mihomo 内部（如 vless vision 握手失败）会把 ERROR 级日志
+  （`XTLS Vision server responded unknown UUID`、`vision: not a valid...`）
+  刷到应用日志——mihomo 与应用此前共用 logrus **默认 logger**
+- 修复：应用改用**独立 logrus 实例**，默认 logger 输出丢弃（`io.Discard`）；
+  应用日志不受影响，第三方库内部噪音全部静默
+- 这些错误本身是无效/过期节点的正常检测信号（节点会被健康检查过滤），
+  但大量节点检测时噪音可观，隔离后日志干净
+- 新增回归测试：默认 logger 输出已丢弃、应用日志正常
+
 ## [v1.1.33] - 2026-08-16
 
 ### 🚀 新增 /loon /quanx 页面与 QuanX 输出
