@@ -5,6 +5,14 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.20] - 2026-08-16
+
+### 🔒 安全修复
+
+- 升级 `github.com/quic-go/quic-go` v0.59.0 → v0.61.0，修复 CVE-2026-40898（medium）
+- 该库由 gin v1.12 的 HTTP/3 支持引入（`quic-go/quic-go/http3`），
+  至此 Dependabot 报告的 25 个漏洞全部清除
+
 ## [v1.1.19] - 2026-08-16
 
 ### 🔧 CI/CD 优化
