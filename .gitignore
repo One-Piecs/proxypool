@@ -9,8 +9,7 @@ tmp/
 
 # Test binary, build with `go test -c`
 *.test
-# Manually add it if neccessary
-*_test.*
+*.test.exe
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out

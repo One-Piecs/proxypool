@@ -1,7 +1,6 @@
 package healthcheck
 
 import (
-	"encoding/json"
 	"errors"
 	"net"
 	"time"
@@ -65,15 +64,12 @@ func RelayCheckWorkpool(proxies proxy.ProxyList) {
 
 // Get outbound relay ip
 func testRelay(p proxy.Proxy) (outip string, err error) {
-	pmap := make(map[string]interface{})
-	err = json.Unmarshal([]byte(p.String()), &pmap)
-	if err != nil {
-		return "", err
+	pmap := proxy.ToClashMap(p)
+	if pmap == nil {
+		return "", errors.New("unsupported proxy type")
 	}
 
-	pmap["port"] = int(pmap["port"].(float64))
 	if p.TypeName() == "vmess" {
-		pmap["alterId"] = int(pmap["alterId"].(float64))
 		if network, ok := pmap["network"]; ok && network.(string) == "h2" {
 			return "", nil // todo 暂无方法测试h2的延迟，clash对于h2的connection会阻塞
 		}

@@ -2,7 +2,6 @@ package healthcheck
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -29,6 +28,9 @@ var (
 		"http://apple-cloudkit.com/generate_204",
 	}
 	maxRetries = 2
+	// 每轮重试最多尝试的 URL 数：健康代理在 2 个 URL 成功后即提前返回，
+	// 失效代理无需把 10 个 URL 全部试完（30 次请求）才判定失败
+	maxTestURLs = 4
 )
 
 // CleanBadProxiesWithWorkpool 对代理做延迟检测，返回可用（延迟非 0）的代理列表。
@@ -92,15 +94,12 @@ func CleanBadProxiesWithWorkpool(proxies []proxy.Proxy) (cproxies []proxy.Proxy)
 
 // Return 0 for error
 func testDelay(p proxy.Proxy) (delay uint16, err error) {
-	pmap := make(map[string]interface{})
-	err = json.Unmarshal([]byte(p.String()), &pmap)
-	if err != nil {
-		return 0, fmt.Errorf("解析代理配置失败: %w", err)
+	pmap := proxy.ToClashMap(p)
+	if pmap == nil {
+		return 0, fmt.Errorf("不支持的代理类型: %s", p.TypeName())
 	}
 
-	pmap["port"] = int(pmap["port"].(float64))
 	if p.TypeName() == "vmess" {
-		pmap["alterId"] = int(pmap["alterId"].(float64))
 		if network, ok := pmap["network"]; ok && network.(string) == "h2" {
 			return 0, fmt.Errorf("不支持h2协议的延迟测试")
 		}
@@ -124,8 +123,8 @@ func testDelay(p proxy.Proxy) (delay uint16, err error) {
 			timeout = time.Duration(float64(timeout) * 1.5)
 		}
 
-		// 遍历所有测试URL
-		for _, testURL := range testURLs {
+		// 遍历测试URL（只取前 maxTestURLs 个）
+		for _, testURL := range testURLs[:min(maxTestURLs, len(testURLs))] {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			currentDelay, err := clashProxy.URLTest(ctx, testURL, expectedStatus)
 			cancel()

@@ -5,9 +5,23 @@ import (
 	"encoding/xml"
 	"errors"
 	"math"
+	"sync"
 	"time"
 
 	C "github.com/metacubex/mihomo/constant"
+)
+
+// 服务器静态列表缓存：speedtest-servers-static.php 内容固定（全球服务器），
+// 无需每个代理都重新下载 ~100KB XML，缓存 1 小时（测速默认 12h 一次）。
+const (
+	serverListTTL     = time.Hour
+	serverListTimeout = 15 * time.Second
+)
+
+var (
+	serverListMu     sync.Mutex
+	serverListCache  *ServerList
+	serverListCached time.Time
 )
 
 // Server information
@@ -54,15 +68,25 @@ func (b ByDistance) Less(i, j int) bool {
 }
 
 func fetchServerList(clashProxy C.Proxy) (ServerList, error) {
+	// 命中缓存则直接复用
+	serverListMu.Lock()
+	if serverListCache != nil && time.Since(serverListCached) < serverListTTL {
+		list := *serverListCache
+		serverListMu.Unlock()
+		return list, nil
+	}
+	serverListMu.Unlock()
+
 	url := "http://www.speedtest.net/speedtest-servers-static.php"
-	body, err := HTTPGetBodyViaProxy(clashProxy, url)
+	// 服务器列表 XML 较大（~100KB），用更长超时，避免慢代理下载不完直接失败
+	body, err := HTTPGetBodyViaProxyWithTime(clashProxy, url, serverListTimeout)
 	if err != nil {
 		return ServerList{}, err
 	}
 
 	if len(body) == 0 {
 		url = "http://c.speedtest.net/speedtest-servers-static.php"
-		body, err = HTTPGetBodyViaProxy(clashProxy, url)
+		body, err = HTTPGetBodyViaProxyWithTime(clashProxy, url, serverListTimeout)
 		if err != nil {
 			return ServerList{}, err
 		}
@@ -84,6 +108,12 @@ func fetchServerList(clashProxy C.Proxy) (ServerList, error) {
 	if len(serverList.Servers) == 0 {
 		return ServerList{}, errors.New("No speedtest server")
 	}
+
+	// 写缓存
+	serverListMu.Lock()
+	serverListCache = &serverList
+	serverListCached = time.Now()
+	serverListMu.Unlock()
 	return serverList, nil
 }
 

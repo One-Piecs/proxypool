@@ -2,8 +2,8 @@ package healthcheck
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,8 +25,9 @@ var (
 	SpeedExist   = false
 )
 
-// SpeedTestAllWithWorkpool tests speed of a group of proxies. Results are stored in ProxyStats
-func SpeedTestAllWithWorkpool(proxies []proxy.Proxy, conns int) {
+// speedTestWithWorkpool 并发测速公共实现。
+// newOnly=true 时仅测试尚未测速或速度为 0 的节点（首次/增量测速）。
+func speedTestWithWorkpool(proxies []proxy.Proxy, conns int, newOnly bool) {
 	SpeedExist = true
 	if ok := checkErrorProxies(proxies); !ok {
 		return
@@ -46,6 +47,18 @@ func SpeedTestAllWithWorkpool(proxies []proxy.Proxy, conns int) {
 		pp := p
 		pool.Submit(func() {
 			defer progress.inc()
+
+			if newOnly {
+				// 仅在节点尚未测速或速度仍为 0 时测试
+				statsLock.RLock()
+				proxyStat, exists := ProxyStats.Find(pp)
+				needTest := !exists || proxyStat.Speed == 0
+				statsLock.RUnlock()
+				if !needTest {
+					return
+				}
+			}
+
 			speed, err := ProxySpeedTest(pp)
 			if err == nil && speed > 0 {
 				statsLock.Lock()
@@ -63,59 +76,18 @@ func SpeedTestAllWithWorkpool(proxies []proxy.Proxy, conns int) {
 		})
 	}
 	pool.StopWait()
-	log.Infoln("Speed Test Done. Count all speed results: %d", resultCount)
+	log.Infoln("Speed Test Done. Speed results count: %d", resultCount)
+}
+
+// SpeedTestAllWithWorkpool tests speed of a group of proxies. Results are stored in ProxyStats
+func SpeedTestAllWithWorkpool(proxies []proxy.Proxy, conns int) {
+	speedTestWithWorkpool(proxies, conns, false)
 }
 
 // SpeedTestNewWithWorkpool tests speed of new proxies which is not in ProxyStats or
 // whose speed is still 0. Then appended to ProxyStats.
 func SpeedTestNewWithWorkpool(proxies []proxy.Proxy, conns int) {
-	SpeedExist = true
-	if ok := checkErrorProxies(proxies); !ok {
-		return
-	}
-	numWorker := conns
-	if numWorker <= 0 {
-		numWorker = 5
-	}
-
-	resultCount := 0
-	progress := newProgress(len(proxies))
-
-	log.Infoln("Speed Test ON")
-
-	pool := workerpool.New(numWorker)
-	for _, p := range proxies {
-		pp := p
-		pool.Submit(func() {
-			defer progress.inc()
-
-			// 仅在节点尚未测速时测试
-			statsLock.RLock()
-			proxyStat, exists := ProxyStats.Find(pp)
-			needTest := !exists || proxyStat.Speed == 0
-			statsLock.RUnlock()
-			if !needTest {
-				return
-			}
-
-			speed, err := ProxySpeedTest(pp)
-			if err == nil && speed > 0 {
-				statsLock.Lock()
-				if proxyStat, ok := ProxyStats.Find(pp); ok {
-					proxyStat.UpdatePSSpeed(speed)
-				} else {
-					ProxyStats = append(ProxyStats, Stat{
-						Id:    pp.Identifier(),
-						Speed: speed,
-					})
-				}
-				resultCount++
-				statsLock.Unlock()
-			}
-		})
-	}
-	pool.StopWait()
-	log.Infoln("Speed Test Done. New speed results count: %d", resultCount)
+	speedTestWithWorkpool(proxies, conns, true)
 }
 
 // ProxySpeedTest returns a speed result of a proxy. The speed result is like 20Mbit/s. -1 for error.
@@ -137,15 +109,13 @@ func ProxySpeedTest(p proxy.Proxy) (speedResult float64, err error) {
 		}
 	}
 
-	// convert to clash proxy struct
-	pmap := make(map[string]interface{})
-	err = json.Unmarshal([]byte(p.String()), &pmap)
-	if err != nil {
-		return -1, err
+	// convert to clash proxy struct（直接构造 map，避免 JSON 往返）
+	pmap := proxy.ToClashMap(p)
+	if pmap == nil {
+		return -1, fmt.Errorf("unsupported proxy type: %s", p.TypeName())
 	}
-	pmap["port"] = int(pmap["port"].(float64))
+
 	if p.TypeName() == "vmess" {
-		pmap["alterId"] = int(pmap["alterId"].(float64))
 		if network, ok := pmap["network"]; ok && network.(string) == "h2" {
 			return 0, nil // todo 暂无方法测试h2的速度，clash对于h2的connection会阻塞
 		}
@@ -172,28 +142,33 @@ func ProxySpeedTest(p proxy.Proxy) (speedResult float64, err error) {
 	// deal fetchUserInfo routine
 	wg.Wait()
 
-	// some logically unexpected error handling
-	if user == nil {
-		return -1, errors.New("fetch User Infoln failed in go routine")
-	}
 	if len(serverList.Servers) == 0 {
 		return -1, errors.New("unexpected error when fetching serverlist: unexpected 0 server")
 	}
 
 	// Calculate distance
-	for i := range serverList.Servers {
-		server := serverList.Servers[i]
-		sLat, _ := strconv.ParseFloat(server.Lat, 64)
-		sLon, _ := strconv.ParseFloat(server.Lon, 64)
-		uLat, _ := strconv.ParseFloat(user.Lat, 64)
-		uLon, _ := strconv.ParseFloat(user.Lon, 64)
-		server.Distance = distance(sLat, sLon, uLat, uLon)
+	if user != nil {
+		for i := range serverList.Servers {
+			server := serverList.Servers[i]
+			sLat, _ := strconv.ParseFloat(server.Lat, 64)
+			sLon, _ := strconv.ParseFloat(server.Lon, 64)
+			uLat, _ := strconv.ParseFloat(user.Lat, 64)
+			uLon, _ := strconv.ParseFloat(user.Lon, 64)
+			server.Distance = distance(sLat, sLon, uLat, uLon)
+		}
+		// Sort by distance
+		sort.Sort(ByDistance{serverList.Servers})
+	} else {
+		// 获取用户位置失败（config 接口被墙等），退化使用服务器列表前几个
+		log.Debugln("fetchUserInfo failed, skip distance sort: %s", p.Identifier())
 	}
-	// Sort by distance
-	sort.Sort(ByDistance{serverList.Servers})
 
 	var targets Servers
-	targets = serverList.Servers[:3]
+	if len(serverList.Servers) >= 3 {
+		targets = serverList.Servers[:3]
+	} else {
+		targets = serverList.Servers
+	}
 
 	// Test
 	targets.StartTest(clashProxy)

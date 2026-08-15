@@ -24,7 +24,8 @@ type Users struct {
 // fetchUserInfo with proxy connection
 func fetchUserInfo(clashProxy C.Proxy) (user *User, err error) {
 	url := "https://www.speedtest.net/speedtest-config.php"
-	body, err := HTTPGetBodyViaProxy(clashProxy, url)
+	// config 接口走代理，用与服务器列表一致的超时，避免慢代理 5s 内取不完
+	body, err := HTTPGetBodyViaProxyWithTime(clashProxy, url, serverListTimeout)
 	if err != nil {
 		return nil, errors.New("Get user to speedtest.net. :" + err.Error())
 	}

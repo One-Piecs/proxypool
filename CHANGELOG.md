@@ -5,6 +5,26 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.22] - 2026-08-16
+
+### 🔧 CI/CD
+
+- Docker 构建改为**仅 tag 推送自动触发**；master/main 分支改为手工触发（`workflow_dispatch`）
+
+### ⚡ 健康检查与测速优化
+
+- **消除 JSON 往返转换**：新增 `proxy.ToClashMap()` 直接由结构体构造 mihomo 配置 map，
+  替代健康检查/测速/中转检测中每次的 `String()`→`json.Unmarshal`，
+  并新增等价性单元测试（与旧行为 JSON 形态完全一致）
+- **延迟检测减少无效请求**：每轮重试最多尝试 4 个测试 URL（原 10 个），
+  健康代理仍 2 个成功即返回，失效代理判定时间大幅缩短
+- **测速服务器列表缓存**：speedtest 静态服务器 XML（~100KB）缓存 1 小时，
+  避免每个代理重复下载；取列表/用户接口超时 5s → 15s，慢代理不再下载不完直接失败
+- **用户位置获取失败降级**：原先直接判定测速失败，现退化为使用服务器列表前 3 个，
+  不再因 config 接口被墙而整批测速失败
+- **合并重复测速函数**：`SpeedTestAllWithWorkpool` 与 `SpeedTestNewWithWorkpool`
+  收敛为单一实现（newOnly 参数区分）
+
 ## [v1.1.21] - 2026-08-16
 
 ### ⚡ GeoIP 数据库处理优化

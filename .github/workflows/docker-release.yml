@@ -2,12 +2,10 @@ name: Build Multi-arch Docker Image
 
 on:
   push:
-    branches:
-      - master
-      - main
     tags:
       - 'v*.*.*'
       - 'v*.*'
+  # master/main 分支改为手工触发（Actions 页面点 Run workflow）
   workflow_dispatch:
 
 env:
