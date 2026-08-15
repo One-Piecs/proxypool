@@ -5,6 +5,26 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.19] - 2026-08-16
+
+### 🔧 CI/CD 优化
+
+- **修复镜像构建不触发的严重 bug**：workflow 仅在 `branches: ['main']` 触发，
+  但默认分支为 `master`，导致推送到 master 从不构建镜像；现同时监听 `master` + `main`
+- 新增 `workflow_dispatch` 手动触发能力
+- 新增 `concurrency` 控制：同一 ref 的重复触发自动取消旧任务，避免并发构建浪费
+- 新增 `go vet` + `go test` 步骤，在构建前拦截代码质量问题
+- 二进制编译改为并行（`make linux-amd64 &` + `make linux-armv8 &`），缩短构建时间
+- 新增 `.dockerignore`：排除 `.git`(107MB)、`bin/` 旧产物(277MB)等，
+  大幅缩减 Docker 构建上下文上传量
+- 新增 `.github/dependabot.yml`：GitHub Actions 每周自动升级并生成可验证的 PR
+- `actions/checkout` v4 → v5
+
+### 🧪 测试
+
+- 修复 `pkg/geoIp` 测试在 CI 上 panic 的问题：GeoIP 数据库缺失且联网下载失败时
+  优雅 `t.Skip` 跳过，而非 panic 导致整个测试失败
+
 ## [v1.1.18] - 2026-08-16
 
 ### 🔒 安全修复

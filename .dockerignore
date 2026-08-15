@@ -1,0 +1,22 @@
+# 版本控制与 IDE
+.git
+.gitignore
+.idea
+.vscode
+
+# 本地数据与日志
+data
+*.db
+log
+
+# 仓库根目录的预编译产物（63MB）
+proxypool
+
+# bin/ 目录仅保留 Dockerfile.release 需要的两个跨平台二进制，
+# 其余预编译产物（277MB）不进入构建上下文
+bin/*
+!bin/proxypool-linux-amd64
+!bin/proxypool-linux-arm64
+
+# macOS 元数据
+**/.DS_Store

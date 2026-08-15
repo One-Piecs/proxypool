@@ -3,13 +3,20 @@ name: Build Multi-arch Docker Image
 on:
   push:
     branches:
-      - 'main'
+      - master
+      - main
     tags:
       - 'v*.*.*'
       - 'v*.*'
+  workflow_dispatch:
 
 env:
   IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/proxypool
+
+# 同一 ref 的并发运行取消旧任务，避免重复触发时浪费构建资源
+concurrency:
+  group: docker-build-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -19,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -27,20 +34,20 @@ jobs:
           go-version: '1.26'
           cache: true
 
-      - name: Build binaries
+      - name: Run vet & tests
         run: |
-          # 编译 AMD64
-          make linux-amd64
-          
-          # 编译 ARM64 (Golang 原生交叉编译)
-          make linux-armv8
-          
+          go vet ./...
+          go test ./... 2>&1 | tail -30
+
+      - name: Build binaries (amd64 + arm64)
+        run: |
+          # 并行交叉编译两个平台，全部完成后继续
+          make linux-amd64 &
+          make linux-armv8 &
+          wait
           # 重命名以匹配 Dockerfile.release 中的 TARGETARCH 命名规范
-          # make 产生的文件在 bin/ 目录下
           mv bin/proxypool-linux-armv8 bin/proxypool-linux-arm64
-          
-          # 验证文件是否存在
-          ls -l bin/
+          ls -lh bin/proxypool-linux-*
 
       - name: Docker meta
         id: meta

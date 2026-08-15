@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # 自动更新 GitHub Actions 版本（如 checkout / setup-go / docker 系列 action），
+  # 每次更新会生成 PR 并触发 workflow 验证，避免手动升级引入不兼容
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
