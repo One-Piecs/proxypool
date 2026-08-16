@@ -5,6 +5,16 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.46] - 2026-08-16
+
+### 🐛 CDN IP 段抓取超时与重试
+
+- 部署环境访问 Google(`www.gstatic.com`)TLS 握手超时(网络受限)，
+  原实现裸 `http.Get` 无超时无重试，失败直接 Error
+- 修复：`pkg/cdn` 统一带超时的 HTTP 客户端(15s) + 一次重试(2s 退避)，
+  5 个 CDN 源(fetchTextCIDRs/AWS/Google/Fastly/Gcore)全部接入
+- Google 失败仍记 Error(环境限制)，但不会无限挂起；其它源成功时有降级
+
 ## [v1.1.45] - 2026-08-16
 
 ### ⚡ 测速结果持久化

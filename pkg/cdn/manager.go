@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/One-Piecs/proxypool/log"
 )
@@ -106,8 +107,26 @@ func (m *Manager) Update() {
 
 // Fetchers
 
+// cdnClient 统一带超时的 HTTP 客户端：原实现裸 http.Get 无超时无重试，
+// 网络受限环境（如无法直连 Google）会长时间挂起。
+var cdnClient = &http.Client{Timeout: 15 * time.Second}
+
+// httpGetWithRetry 带超时与一次重试的 GET 请求
+func httpGetWithRetry(url string) (*http.Response, error) {
+	for attempt := 0; ; attempt++ {
+		resp, err := cdnClient.Get(url)
+		if err == nil {
+			return resp, nil
+		}
+		if attempt >= 1 {
+			return nil, err
+		}
+		time.Sleep(2 * time.Second)
+	}
+}
+
 func fetchTextCIDRs(url string) ([]*net.IPNet, error) {
-	resp, err := http.Get(url)
+	resp, err := httpGetWithRetry(url)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +159,7 @@ type awsIPRanges struct {
 }
 
 func fetchAWS() ([]*net.IPNet, error) {
-	resp, err := http.Get("https://ip-ranges.amazonaws.com/ip-ranges.json")
+	resp, err := httpGetWithRetry("https://ip-ranges.amazonaws.com/ip-ranges.json")
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +195,7 @@ type googleIPRanges struct {
 }
 
 func fetchGoogle() ([]*net.IPNet, error) {
-	resp, err := http.Get("https://www.gstatic.com/ipranges/goog.json")
+	resp, err := httpGetWithRetry("https://www.gstatic.com/ipranges/goog.json")
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +231,7 @@ type fastlyIPRanges struct {
 }
 
 func fetchFastly() ([]*net.IPNet, error) {
-	resp, err := http.Get("https://api.fastly.com/public-ip-list")
+	resp, err := httpGetWithRetry("https://api.fastly.com/public-ip-list")
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +265,7 @@ type gcoreIPRanges struct {
 }
 
 func fetchGcore() ([]*net.IPNet, error) {
-	resp, err := http.Get("https://api.gcore.com/cdn/public-ip-list")
+	resp, err := httpGetWithRetry("https://api.gcore.com/cdn/public-ip-list")
 	if err != nil {
 		return nil, err
 	}
