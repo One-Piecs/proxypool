@@ -80,6 +80,22 @@ func ToClashMap(p Proxy) map[string]interface{} {
 			m["skip-cert-verify"] = pp.SkipCertVerify
 		}
 		return m
+	case *AnyTLS:
+		m := clashBaseMap(pp.Base)
+		m["password"] = pp.Password
+		if pp.UDP {
+			m["udp"] = pp.UDP
+		}
+		if pp.SNI != "" {
+			m["sni"] = pp.SNI
+		}
+		if len(pp.ALPN) > 0 {
+			m["alpn"] = pp.ALPN
+		}
+		if pp.SkipCertVerify {
+			m["skip-cert-verify"] = pp.SkipCertVerify
+		}
+		return m
 	case *Vless:
 		m := clashBaseMap(pp.Base)
 		m["uuid"] = pp.UUID

@@ -7,7 +7,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="HandheldFriendly" content="True">
     <title>Free Proxies</title>
-    <meta property="og:description" content="免费的ss、ssr、vmess、trojan、vless节点">
+    <meta property="og:description" content="免费的ss、ssr、vmess、trojan、vless、anytls节点">
     <meta name="keywords" content="免费的ss、ssr、vmess、torjan节点">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
     <!-- <link rel="stylesheet" type="text/css" href="css/client/metron-icon.css" /> -->
@@ -44,15 +44,15 @@
 <!-- Body -->
 <div class="container">
     <div class="section pb-0">
-        <p>⭐️ 自动抓取tg频道、订阅地址、公开互联网上的ss、ssr、vmess、trojan、vless节点信息，聚合去重检测后提供节点列表</p>
+        <p>⭐️ 自动抓取tg频道、订阅地址、公开互联网上的ss、ssr、vmess、trojan、vless、anytls节点信息，聚合去重检测后提供节点列表</p>
         <p>❗️ 任何使用此开源项目的人须遵守<a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL3.0</a>协议，禁止盈利</p>
         <hr class="pt-0 pb-0 mb-0 mt-2">
     </div>
     <section class='section'>
         <h5 class="title is-4 mt-3">统计</h5>
         <p>目前共有抓取源<b class="has-text-primary"> {{ .getters_count }} </b>个，
-            全部节点<b class="has-text-primary"> {{ .all_proxies_count }} </b>个，ss节点<b class="has-text-primary"> {{ .ss_proxies_count }} </b>个，ssr节点<b class="has-text-primary"> {{ .ssr_proxies_count }} </b>个，vmess节点<b class="has-text-primary"> {{ .vmess_proxies_count }} </b>个，trojan节点<b class="has-text-primary"> {{ .trojan_proxies_count }} </b>个，vless节点<b class="has-text-primary"> {{ .vless_proxies_count }} </b>个</p>
-        <p>可用节点数量：全部 <b class="has-text-primary"> {{ .useful_proxies_count }} </b>个，ss节点<b class="has-text-primary"> {{ .useful_ss_proxies_count }} </b>个，ssr节点<b class="has-text-primary"> {{ .useful_ssr_proxies_count }} </b>个，vmess节点<b class="has-text-primary"> {{ .useful_vmess_proxies_count }} </b>个，trojan节点<b class="has-text-primary"> {{ .useful_trojan_proxies_count }} </b>个，vless节点<b class="has-text-primary"> {{ .useful_vless_proxies_count }} </b>个</p>
+            全部节点<b class="has-text-primary"> {{ .all_proxies_count }} </b>个，ss节点<b class="has-text-primary"> {{ .ss_proxies_count }} </b>个，ssr节点<b class="has-text-primary"> {{ .ssr_proxies_count }} </b>个，vmess节点<b class="has-text-primary"> {{ .vmess_proxies_count }} </b>个，trojan节点<b class="has-text-primary"> {{ .trojan_proxies_count }} </b>个，vless节点<b class="has-text-primary"> {{ .vless_proxies_count }} </b>个，anytls节点<b class="has-text-primary"> {{ .anytls_proxies_count }} </b>个</p>
+        <p>可用节点数量：全部 <b class="has-text-primary"> {{ .useful_proxies_count }} </b>个，ss节点<b class="has-text-primary"> {{ .useful_ss_proxies_count }} </b>个，ssr节点<b class="has-text-primary"> {{ .useful_ssr_proxies_count }} </b>个，vmess节点<b class="has-text-primary"> {{ .useful_vmess_proxies_count }} </b>个，trojan节点<b class="has-text-primary"> {{ .useful_trojan_proxies_count }} </b>个，vless节点<b class="has-text-primary"> {{ .useful_vless_proxies_count }} </b>个，anytls节点<b class="has-text-primary"> {{ .useful_anytls_proxies_count }} </b>个</p>
         <p>是否开启测速：<b class="has-text-primary">{{ .is_speed_test }}</b></p>
         <p>最后更新时间：<b class="has-text-primary">{{ .last_crawl_time }}</b></p>
         <p>GeoIP：<b class="has-text-primary">{{ .geo_ip_db_version }}</b></p>
@@ -143,6 +143,11 @@
                 <tr>
                     <th>vless</th>
                     <td>https://{{ .domain }}/vless/sub</td>
+                    <td class="has-text-right"><button class="button is-small is-primary" onclick="onCopy(this)">复制</button></td>
+                </tr>
+                <tr>
+                    <th>anytls</th>
+                    <td>https://{{ .domain }}/clash/proxies?type=anytls</td>
                     <td class="has-text-right"><button class="button is-small is-primary" onclick="onCopy(this)">复制</button></td>
                 </tr>
                 </tbody>

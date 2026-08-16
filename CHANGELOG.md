@@ -5,6 +5,25 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.44] - 2026-08-16
+
+### 🚀 新增 anytls 协议支持
+
+- **新增 `pkg/proxy/anytls.go`**：AnyTLS 类型 + 链接解析/生成
+  （`anytls://password@host:port?sni=...&alpn=...#name`）+ Clash/Loon/QuanX 输出
+  （Surge 不支持 anytls，输出为空）
+- **接入**：ParseProxyFromLink / ParseProxyFromClashProxy / ToClashMap（mihomo 原生支持，
+  已验证解析）/ GrepLinksFromString / checkClashSupport / checkQuanXSupport / checkLoonSupport
+- **IsTLS**：anytls 视为 TLS（`tls=true` 过滤包含）
+- **统计与页面**：TypeCounts / 缓存变量 / 首页计数与订阅入口 / clash.html type 筛选值
+- 新增 5 个单元测试（往返、解析、三端输出、mihomo 解析、链接抓取）
+
+## [v1.1.43] - 2026-08-16
+
+### 🧪 补充 tls/reality 过滤默认行为断言
+
+- 无参数时返回全部节点（默认不区分），`TestTLSRealityFilter` 增加断言
+
 ## [v1.1.42] - 2026-08-16
 
 ### 🚀 新增 tls / reality 筛选参数

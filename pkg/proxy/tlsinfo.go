@@ -10,6 +10,8 @@ func IsTLS(p Proxy) bool {
 		return pp.TLS
 	case *Trojan:
 		return true
+	case *AnyTLS:
+		return true
 	}
 	return false
 }

@@ -69,6 +69,9 @@ func checkClashSupport(p proxy.Proxy) bool {
 	case "vless":
 		// vless 无需加密方式白名单，mihomo 原生支持
 		return true
+	case "anytls":
+		// anytls 无需加密方式白名单，mihomo 原生支持
+		return true
 	default:
 		return false
 	}

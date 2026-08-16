@@ -15,6 +15,8 @@ var (
 	UsefullVmessProxiesCount  = 0
 	UsefullTrojanProxiesCount = 0
 	UsefullVlessProxiesCount  = 0
+	AnyTLSProxiesCount        = 0
+	UsefullAnyTLSProxiesCount = 0
 	LastCrawlTime             = "程序正在启动，请于3分钟后刷新页面"
 	IsSpeedTest               = "未开启"
 )

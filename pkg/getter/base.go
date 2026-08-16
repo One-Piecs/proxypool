@@ -62,6 +62,7 @@ func GrepLinksFromString(text string) []string {
 	results = append(results, proxy.GrepSSLinkFromString(text)...)
 	results = append(results, proxy.GrepTrojanLinkFromString(text)...)
 	results = append(results, proxy.GrepVlessLinkFromString(text)...)
+	results = append(results, proxy.GrepAnyTLSLinkFromString(text)...)
 	return results
 }
 

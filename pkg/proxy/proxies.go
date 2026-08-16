@@ -56,7 +56,7 @@ func (ps ProxyList) TypeLen(t string) int {
 }
 
 // TypeCounts 单次遍历统计各类型数量（替代多次 TypeLen 的 O(4n) 扫描）
-func (ps ProxyList) TypeCounts() (ss, ssr, vmess, trojan, vless int) {
+func (ps ProxyList) TypeCounts() (ss, ssr, vmess, trojan, vless, anytls int) {
 	for _, p := range ps {
 		switch p.TypeName() {
 		case "ss":
@@ -69,6 +69,8 @@ func (ps ProxyList) TypeCounts() (ss, ssr, vmess, trojan, vless int) {
 			trojan++
 		case "vless":
 			vless++
+		case "anytls":
+			anytls++
 		}
 	}
 	return
