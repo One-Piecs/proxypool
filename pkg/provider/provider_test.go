@@ -59,4 +59,8 @@ func TestTLSRealityFilter(t *testing.T) {
 	if n := run("true", "true"); n != 1 {
 		t.Errorf("tls=true&reality=true -> %d, want 1 (仅 reality 节点)", n)
 	}
+	// 默认不区分：不带参数返回所有节点
+	if n := run("", ""); n != 4 {
+		t.Errorf("no filter -> %d, want 4 (全部节点)", n)
+	}
 }
