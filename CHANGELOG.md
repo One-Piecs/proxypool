@@ -5,6 +5,29 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.42] - 2026-08-16
+
+### 🚀 新增 tls / reality 筛选参数
+
+- `/clash|/loon|/quanx|/v2rayn/proxies` 支持 `tls` 与 `reality` 查询参数：
+  - `tls=true|1`：仅 TLS 节点（trojan / vmess+tls / vless+tls）
+  - `tls=false|0`：仅非 TLS 节点
+  - `reality=true|1`：仅 Reality 节点（vless+reality）
+  - `reality=false|0`：仅非 Reality 节点
+  - 可与现有 type/c/speed 等参数组合
+- 新增 `proxy.IsTLS` / `proxy.IsReality` 判断函数（trojan 视为 TLS；reality 仅 vless 有）
+- 无筛选判断同步更新，带 tls/reality 参数不命中缓存
+- `/clash` 页面筛选参数表格新增两行说明
+- 新增 `TestTLSRealityFilter` 组合过滤测试
+
+## [v1.1.41] - 2026-08-16
+
+### 📝 修复 CHANGELOG.md 版本顺序混乱
+
+- v1.1.36 用 `cat >>` 追加导致版本 section 被割成两段
+  （开头 35→17，末尾 40→36）；按版本号降序重排为 40→17 连续正序，
+  24 个版本内容无缺失无变化
+
 ## [v1.1.40] - 2026-08-16
 
 ### 🐛 按官方示例最终校准 Loon / QuanX 的 vless 格式

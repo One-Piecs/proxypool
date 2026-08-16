@@ -24,6 +24,8 @@ type Base struct {
 	Speed           string           `yaml:"speed"`
 	Filter          string           `yaml:"filter"`
 	UnderlyingProxy string           `yaml:"underlyingProxy"`
+	TLS             string           `yaml:"tls"`     // true/1 只要 TLS；false/0 只要非 TLS
+	Reality         string           `yaml:"reality"` // true/1 只要 Reality；false/0 只要非 Reality
 }
 
 // 根据子类的的Provide()传入的信息筛选节点，结果会改变传入的proxylist。
@@ -41,6 +43,8 @@ func (b *Base) preFilter() {
 	needFilterNotCountry := true
 	needFilterSpeed := true
 	needFilterFilter := true
+	needFilterTLS := true
+	needFilterReality := true
 
 	if b.Types == "" || b.Types == "all" {
 		needFilterType = false
@@ -57,6 +61,15 @@ func (b *Base) preFilter() {
 	if b.Filter == "" {
 		needFilterFilter = false
 	}
+	if b.TLS == "" {
+		needFilterTLS = false
+	}
+	if b.Reality == "" {
+		needFilterReality = false
+	}
+	// tls/reality 参数：true/1 取值为真，其余视为假
+	tlsWant := b.TLS == "true" || b.TLS == "1"
+	realityWant := b.Reality == "true" || b.Reality == "1"
 
 	types := strings.Split(b.Types, ",")
 	countries := strings.Split(b.Country, ",")
@@ -117,6 +130,14 @@ func (b *Base) preFilter() {
 					goto exclude
 				}
 			}
+		}
+
+		// tls / reality 过滤（仅对 TLS/Reality 语义相关的协议生效）
+		if needFilterTLS && proxy.IsTLS(p) != tlsWant {
+			goto exclude
+		}
+		if needFilterReality && proxy.IsReality(p) != realityWant {
+			goto exclude
 		}
 
 		if needFilterSpeed && len(healthcheck.ProxyStats) != 0 && healthcheck.SpeedExist {

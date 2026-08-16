@@ -134,9 +134,11 @@ func serveProxyList(c *gin.Context, cacheKey string, supportUnderlyingProxy bool
 	proxySpeed := c.DefaultQuery("speed", "")
 	proxyFilter := c.DefaultQuery("filter", "")
 	proxyUnderlyingProxy := c.DefaultQuery("underlyingproxy", "")
+	proxyTLS := c.DefaultQuery("tls", "")
+	proxyReality := c.DefaultQuery("reality", "")
 
 	noFilter := proxyTypes == "" && proxyCountry == "" && proxyNotCountry == "" &&
-		proxySpeed == "" && proxyFilter == "" &&
+		proxySpeed == "" && proxyFilter == "" && proxyTLS == "" && proxyReality == "" &&
 		(!supportUnderlyingProxy || proxyUnderlyingProxy == "")
 
 	base := provider.Base{
@@ -146,6 +148,8 @@ func serveProxyList(c *gin.Context, cacheKey string, supportUnderlyingProxy bool
 		Speed:           proxySpeed,
 		Filter:          proxyFilter,
 		UnderlyingProxy: proxyUnderlyingProxy,
+		TLS:             proxyTLS,
+		Reality:         proxyReality,
 	}
 
 	if noFilter {
