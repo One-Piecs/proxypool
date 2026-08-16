@@ -5,6 +5,14 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.47] - 2026-08-16
+
+### 🧹 CDN 源失败降级为 Warn
+
+- `www.gstatic.com` 等 CDN 源在部分部署环境被访问限制，失败是**预期行为**
+  （其它源成功时有降级，总计数正常）
+- 5 个外部 CDN 源抓取失败从 `Errorln` 降为 `Warnln`，避免部署日志 ERROR 噪音
+
 ## [v1.1.46] - 2026-08-16
 
 ### 🐛 CDN IP 段抓取超时与重试

@@ -42,7 +42,7 @@ func (m *Manager) Update() {
 		for _, url := range cfUrls {
 			cidrs, err := fetchTextCIDRs(url)
 			if err != nil {
-				log.Errorln("Failed to fetch CF CDN list from %s: %v", url, err)
+				log.Warnln("Failed to fetch CF CDN list from %s: %v", url, err)
 				continue
 			}
 			appendRanges(cidrs)
@@ -55,7 +55,7 @@ func (m *Manager) Update() {
 		defer wg.Done()
 		cidrs, err := fetchAWS()
 		if err != nil {
-			log.Errorln("Failed to fetch AWS list: %v", err)
+			log.Warnln("Failed to fetch AWS list: %v", err)
 			return
 		}
 		appendRanges(cidrs)
@@ -67,7 +67,7 @@ func (m *Manager) Update() {
 		defer wg.Done()
 		cidrs, err := fetchGoogle()
 		if err != nil {
-			log.Errorln("Failed to fetch Google list: %v", err)
+			log.Warnln("Failed to fetch Google list: %v", err)
 			return
 		}
 		appendRanges(cidrs)
@@ -79,7 +79,7 @@ func (m *Manager) Update() {
 		defer wg.Done()
 		cidrs, err := fetchFastly()
 		if err != nil {
-			log.Errorln("Failed to fetch Fastly list: %v", err)
+			log.Warnln("Failed to fetch Fastly list: %v", err)
 			return
 		}
 		appendRanges(cidrs)
@@ -91,7 +91,7 @@ func (m *Manager) Update() {
 		defer wg.Done()
 		cidrs, err := fetchGcore()
 		if err != nil {
-			log.Errorln("Failed to fetch Gcore list: %v", err)
+			log.Warnln("Failed to fetch Gcore list: %v", err)
 			return
 		}
 		appendRanges(cidrs)
