@@ -61,7 +61,9 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
-	cdn.GlobalManager.Update()
+	// CDN IP 段后台异步加载：某些源（如 Google）在部分环境被访问限制，
+	// 同步加载会阻塞 web 服务启动（超时+重试最多约 30s）
+	go cdn.GlobalManager.Update()
 
 	log.Infoln("Do the first crawl...")
 	go app.CrawlGo()      // 抓取主程序

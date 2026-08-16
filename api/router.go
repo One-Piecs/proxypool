@@ -174,11 +174,17 @@ func serveProxyList(c *gin.Context, cacheKey string, supportUnderlyingProxy bool
 	return provide(proxies, base)
 }
 
-// subHandler 生成 /ss|/ssr|/vmess|/sip002|/trojan/sub 接口 handler
+// subHandler 生成 /ss|/ssr|/vmess|/sip002|/trojan|/vless/sub 接口 handler，
+// 支持 tls / reality 过滤参数（与 /proxies 接口一致）
 func subHandler(types string, provide func(provider.Base) string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		proxies := appcache.GetProxies("proxies")
-		base := provider.Base{Proxies: &proxies, Types: types}
+		base := provider.Base{
+			Proxies: &proxies,
+			Types:   types,
+			TLS:     c.Query("tls"),
+			Reality: c.Query("reality"),
+		}
 		c.String(http.StatusOK, provide(base))
 	}
 }

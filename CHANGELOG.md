@@ -5,6 +5,18 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.48] - 2026-08-16
+
+### 🚀 订阅接口支持 tls / reality 过滤 + 启动提速
+
+- **`/ss|/ssr|/vmess|/sip002|/trojan|/vless/sub` 支持 `tls` / `reality` 查询参数**
+  （与 /proxies 接口一致，如 `/vless/sub?reality=true` 只返回 Reality 节点）
+- **修复启动阻塞**：`cdn.GlobalManager.Update()` 原为同步调用且在 `api.Run()` 之前，
+  部分环境访问 Google 受限时（15s 超时+重试≈30s）web 服务迟迟不监听端口；
+  改为后台 goroutine 异步加载，启动立即就绪
+- 附注：此前冒烟测试观察到的 503 是测试机 curl 走了本机代理（http_proxy）所致，
+  与代码无关
+
 ## [v1.1.47] - 2026-08-16
 
 ### 🧹 CDN 源失败降级为 Warn
