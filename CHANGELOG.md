@@ -5,6 +5,18 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.45] - 2026-08-16
+
+### ⚡ 测速结果持久化
+
+- 原实现测速结果只存内存（`ProxyStats`），重启后速度标签丢失，需等下次测速（12h）恢复
+- **DB `Proxy` 表新增 `Speed` 字段**（AutoMigrate 自动加列，旧库兼容）：
+  - `SaveProxyList` 附带最近一次已知速度
+  - 新增 `SaveProxiesSpeed`：测速完成后按 identifier upsert 速度
+  - `GetAllProxies` 加载时通过 `healthcheck.InitSpeed` 恢复速度，
+    启动后速度标签/速度过滤立即可用（无需等测速）
+- 新增 `TestSpeedPersistence`：保存→清空统计→重载恢复全链路验证
+
 ## [v1.1.44] - 2026-08-16
 
 ### 🚀 新增 anytls 协议支持

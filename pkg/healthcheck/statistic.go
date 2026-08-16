@@ -39,6 +39,26 @@ func IncReqCount(p proxy.Proxy) {
 	statsLock.Unlock()
 }
 
+// InitSpeed 恢复历史测速结果到统计（启动从数据库加载时调用）。
+// 同时置 SpeedExist，使 provider 的速度过滤与标签立即生效。
+func InitSpeed(id string, speed float64) {
+	if speed <= 0 {
+		return
+	}
+	statsLock.Lock()
+	for i := range ProxyStats {
+		if ProxyStats[i].Id == id {
+			ProxyStats[i].Speed = speed
+			statsLock.Unlock()
+			SpeedExist = true
+			return
+		}
+	}
+	ProxyStats = append(ProxyStats, Stat{Id: id, Speed: speed})
+	statsLock.Unlock()
+	SpeedExist = true
+}
+
 // Statistic for a proxy
 type Stat struct {
 	Speed    float64

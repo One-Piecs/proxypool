@@ -7,6 +7,7 @@ import (
 	"github.com/gammazero/workerpool"
 
 	"github.com/One-Piecs/proxypool/log"
+	"github.com/One-Piecs/proxypool/pkg/healthcheck"
 	"github.com/One-Piecs/proxypool/pkg/proxy"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -20,6 +21,8 @@ type Proxy struct {
 	proxy.Base
 	Link       string
 	Identifier string `gorm:"unique"`
+	// 最近一次测速结果(Mbps)，随代理持久化，重启后恢复
+	Speed float64
 }
 
 func InitTables() {
@@ -61,6 +64,10 @@ func SaveProxyList(pl proxy.ProxyList) {
 				Identifier: pl[i].Identifier(),
 			}
 			p.Useable = true
+			// 附带最近一次已知测速结果
+			if ps, ok := healthcheck.FindStat(pl[i]); ok {
+				p.Speed = ps.Speed
+			}
 			records = append(records, p)
 		}
 
@@ -84,9 +91,9 @@ func GetAllProxies() (proxies proxy.ProxyList) {
 	}
 
 	proxiesDB := make([]Proxy, 0)
-	// 同时取回 name/country：解析出来的节点默认 name 为空，
+	// 同时取回 name/country/speed：解析出来的节点默认 name 为空，
 	// 启动加载阶段（首轮爬取完成前）会直接暴露给 /proxies 接口
-	DB.Select("link, name, country").Find(&proxiesDB)
+	DB.Select("link, name, country, speed").Find(&proxiesDB)
 
 	wp := workerpool.New(100)
 	m := sync.Mutex{}
@@ -105,6 +112,10 @@ func GetAllProxies() (proxies proxy.ProxyList) {
 				if pDB.Country != "" {
 					p.SetCountry(pDB.Country)
 				}
+				// 恢复上次测速结果，重启后速度标签立即可用
+				if pDB.Speed > 0 {
+					healthcheck.InitSpeed(p.Identifier(), pDB.Speed)
+				}
 				m.Lock()
 				proxies = append(proxies, p)
 				m.Unlock()
@@ -113,6 +124,36 @@ func GetAllProxies() (proxies proxy.ProxyList) {
 	}
 	wp.StopWait()
 	return
+}
+
+// SaveProxiesSpeed 将测速结果写入数据库（测速完成后调用）。
+// 仅更新 speed 字段，按 identifier upsert。
+func SaveProxiesSpeed(pl proxy.ProxyList) {
+	if DB == nil || pl.Len() == 0 {
+		return
+	}
+
+	records := make([]Proxy, 0, pl.Len())
+	for i := 0; i < pl.Len(); i++ {
+		ps, ok := healthcheck.FindStat(pl[i])
+		if !ok || ps.Speed <= 0 {
+			continue
+		}
+		records = append(records, Proxy{
+			Identifier: pl[i].Identifier(),
+			Speed:      ps.Speed,
+		})
+	}
+	if len(records) == 0 {
+		return
+	}
+
+	if err := DB.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "identifier"}},
+		DoUpdates: clause.AssignmentColumns([]string{"speed", "updated_at"}),
+	}).CreateInBatches(records, 500).Error; err != nil {
+		log.Warnln("database: SaveProxiesSpeed failed: %s", err.Error())
+	}
 }
 
 // Clear proxies unusable more than 1 week

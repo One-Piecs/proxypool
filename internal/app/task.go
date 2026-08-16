@@ -191,6 +191,8 @@ func speedTestNew(proxies proxy.ProxyList) {
 			healthcheck.SpeedTimeout = time.Second * time.Duration(config.Config().Timeout)
 		}
 		healthcheck.SpeedTestNewWithWorkpool(proxies, config.Config().Connection)
+		// 测速结果持久化到数据库，重启后恢复
+		database.SaveProxiesSpeed(proxies)
 	} else {
 		cache.IsSpeedTest = "未开启"
 	}
@@ -204,6 +206,8 @@ func SpeedTest(proxies proxy.ProxyList) {
 			healthcheck.SpeedTimeout = time.Second * time.Duration(config.Config().Timeout)
 		}
 		healthcheck.SpeedTestAllWithWorkpool(proxies, config.Config().Connection)
+		// 测速结果持久化到数据库，重启后恢复
+		database.SaveProxiesSpeed(proxies)
 	} else {
 		cache.IsSpeedTest = "未开启"
 	}
