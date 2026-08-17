@@ -454,8 +454,8 @@ func setupRouter() {
 func Run() {
 	setupRouter()
 	servePort := config.Config().Port
-	envp := os.Getenv("PORT") // environment port for heroku app
-	if envp != "" {
+	// heroku 平台通过 PORT 环境变量指定端口（仅 heroku 生效，避免普通部署被环境变量覆盖）
+	if envp := os.Getenv("PORT"); envp != "" && os.Getenv("DYNO") != "" {
 		servePort = envp
 	}
 	// Run on this server

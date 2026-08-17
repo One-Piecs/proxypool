@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	level      = INFO
+	level = INFO
 	// logger 是应用自己的 logrus 实例。
 	// 第三方库（如 metacubex/mihomo）直接使用 logrus 默认 logger，
 	// 若共用会导致健康检查/测速时 mihomo 内部噪音（如 vision 握手失败）

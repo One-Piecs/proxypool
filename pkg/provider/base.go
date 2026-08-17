@@ -85,8 +85,21 @@ func (b *Base) preFilter() {
 		if needFilterType {
 			typeOk := false
 			for _, t := range types {
-				if p.TypeName() == t {
-					typeOk = true
+				switch strings.TrimSpace(t) {
+				case "reality": // 特性匹配：Reality 安全层（目前仅 vless）
+					if proxy.IsReality(p) {
+						typeOk = true
+					}
+				case "tls": // 特性匹配：TLS 加密
+					if proxy.IsTLS(p) {
+						typeOk = true
+					}
+				default: // 协议类型精确匹配：ss ssr vmess trojan vless anytls
+					if p.TypeName() == t {
+						typeOk = true
+					}
+				}
+				if typeOk {
 					break
 				}
 			}

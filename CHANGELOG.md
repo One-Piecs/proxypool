@@ -5,6 +5,18 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.49] - 2026-08-17
+
+### 🎛 type 参数支持多类型 + PORT 环境变量修复
+
+- **`type` 参数支持逗号分隔多类型**：`type=trojan,reality,anytls`
+  - 协议类型精确匹配（ss/ssr/vmess/trojan/vless/anytls）
+  - **`reality` / `tls` 作为特性匹配**（`type=reality` 匹配 Reality 节点，`type=tls` 匹配 TLS 节点）
+  - 适用于 /clash|/surge|/loon|/quanx|/v2rayn/proxies 全部接口
+  - 新增 `TestMultiTypeFilter` 覆盖多类型/特性/空类型用例
+- **修复 PORT 环境变量覆盖配置端口**：原 `os.Getenv("PORT")` 无条件生效，
+  普通部署环境存在 PORT 变量时会被顶到随机端口；改为仅 heroku（DYNO）环境生效
+
 ## [v1.1.48] - 2026-08-16
 
 ### 🚀 订阅接口支持 tls / reality 过滤 + 启动提速
